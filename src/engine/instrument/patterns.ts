@@ -12,20 +12,31 @@ export function transformPattern(tr: Transformer, node: PatternNode, renames?: {
       return id(node.name);
     case 'MemberExpression':
       return memberTarget(tr, node);
-    case 'AssignmentPattern':
-      return t.assignmentPattern(transformPattern(tr, node.left, renames) as BabelTypes.Identifier, tr.expr(node.right));
+    // Patterns are assembled field by field: Babel's builders reject member targets inside object
+    // patterns and defaults (`({ p: arr[2] = 0 } = o)`) that the parser itself produces.
+    case 'AssignmentPattern': {
+      const left = transformPattern(tr, node.left, renames) as BabelTypes.AssignmentPattern['left'];
+      const pattern = t.assignmentPattern(id('_'), tr.expr(node.right));
+      pattern.left = left;
+      return pattern;
+    }
     case 'ArrayPattern':
       return t.arrayPattern(node.elements.map((el) => (el ? (transformPattern(tr, el, renames) as BabelTypes.PatternLike) : null)));
-    case 'ObjectPattern':
-      return t.objectPattern(node.properties.map((p) => {
+    case 'ObjectPattern': {
+      const pattern = t.objectPattern([]);
+      pattern.properties = node.properties.map((p) => {
         if (t.isRestElement(p)) return transformPattern(tr, p, renames) as BabelTypes.RestElement;
         const key = p.computed ? transformKey(tr, p.key) : p.key;
-        const value = transformPattern(tr, p.value as PatternNode, renames) as BabelTypes.PatternLike;
-        const shorthand = p.shorthand && !p.computed && t.isIdentifier(key) &&
+        const value = transformPattern(tr, p.value as PatternNode, renames) as BabelTypes.ObjectProperty['value'];
+        const prop = t.objectProperty(key as Expression, id('_'), p.computed, false);
+        prop.value = value;
+        prop.shorthand = p.shorthand && !p.computed && t.isIdentifier(key) &&
           ((t.isIdentifier(value) && value.name === key.name) ||
             (t.isAssignmentPattern(value) && t.isIdentifier(value.left) && value.left.name === key.name));
-        return t.objectProperty(key as Expression, value, p.computed, shorthand);
-      }));
+        return prop;
+      });
+      return pattern;
+    }
     case 'RestElement': {
       if (renames && t.isIdentifier(node.argument)) {
         const tmp = tr.uid('r');

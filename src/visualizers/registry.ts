@@ -1,0 +1,27 @@
+/** Every visualizer plugin. Adding one = a folder `src/visualizers/<id>/` exporting a `Visualizer` + one line here. */
+import { arrayVisualizer } from './array';
+import { scalarsVisualizer } from './scalars';
+import type { AnyVisualizer } from './types';
+
+const PLUGINS: AnyVisualizer[] = [
+  arrayVisualizer,
+  scalarsVisualizer,
+];
+
+export function visualizers(): readonly AnyVisualizer[] {
+  return PLUGINS;
+}
+
+export function visualizerById(id: string): AnyVisualizer | undefined {
+  return PLUGINS.find((p) => p.id === id);
+}
+
+/** Runtime registration (tests, extensions); returns the unregister function. */
+export function registerVisualizer(plugin: AnyVisualizer): () => void {
+  if (visualizerById(plugin.id)) throw new Error(`Visualizer "${plugin.id}" is already registered`);
+  PLUGINS.push(plugin);
+  return () => {
+    const k = PLUGINS.indexOf(plugin);
+    if (k >= 0) PLUGINS.splice(k, 1);
+  };
+}

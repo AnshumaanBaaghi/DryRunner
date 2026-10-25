@@ -1,4 +1,4 @@
-/** Modal dialogs: entry-call picker, run settings, breakpoint condition. Forms reset by remounting (key). */
+/** Modal dialogs: entry-call picker, settings, breakpoint condition. Forms reset by remounting (key). */
 import { Dialog } from 'radix-ui';
 import { useState, type ReactNode } from 'react';
 import type { StaticAnalysis } from '../../engine/types/meta';
@@ -6,6 +6,7 @@ import type { RunLimits } from '../../engine/types/trace';
 import { useEditor } from '../../state/editorStore';
 import { useRun } from '../../state/runStore';
 import { useUi } from '../../state/uiStore';
+import { useViz, type Quality } from '../../state/vizStore';
 import { Button } from '../primitives';
 
 function Shell({ open, onOpenChange, title, description, children }: {
@@ -81,6 +82,7 @@ function EntryDialog() {
 
 function SettingsForm({ initial, onClose }: { initial: RunLimits; onClose: () => void }) {
   const [draft, setDraft] = useState(initial);
+  const [stage, setStage] = useState(() => ({ quality: useViz.getState().quality, follow: useViz.getState().follow }));
   const field = (label: string, key: keyof RunLimits, min: number, max: number, hint: string, scale = 1) => (
     <label className="block">
       <span className="mb-1 flex justify-between text-xs text-ink-dim"><span>{label}</span><span className="text-ink-faint">{hint}</span></span>
@@ -96,10 +98,27 @@ function SettingsForm({ initial, onClose }: { initial: RunLimits; onClose: () =>
         {field('Time limit (s)', 'timeoutMs', 0.5, 10, '0.5 – 10 s', 1000)}
         {field('Random seed', 'seed', 0, 2_147_483_647, 'Math.random')}
       </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4">
+        <label className="block">
+          <span className="mb-1 block text-xs text-ink-dim">3D quality</span>
+          <select className={inputClass} value={stage.quality} data-testid="settings-quality"
+            onChange={(e) => setStage({ ...stage, quality: e.target.value as Quality })}>
+            <option value="high">High — bloom, soft shadows</option>
+            <option value="low">Low — faster</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink">
+          <input type="checkbox" checked={stage.follow} data-testid="settings-follow"
+            onChange={(e) => setStage({ ...stage, follow: e.target.checked })} />
+          Camera follows changes
+        </label>
+      </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button onClick={onClose}>Cancel</Button>
         <Button variant="primary" onClick={() => {
           useRun.getState().setLimits(draft);
+          useViz.getState().setQuality(stage.quality);
+          useViz.getState().setFollow(stage.follow);
           onClose();
         }}>Save</Button>
       </div>
@@ -112,7 +131,7 @@ function SettingsDialog() {
   const setOpen = useUi((s) => s.setSettingsOpen);
   const limits = useRun((s) => s.limits);
   return (
-    <Shell open={open} onOpenChange={setOpen} title="Run settings" description="Limits keep runaway code from freezing the tab; the trace up to a limit stays playable.">
+    <Shell open={open} onOpenChange={setOpen} title="Settings" description="Limits keep runaway code from freezing the tab; the trace up to a limit stays playable.">
       {open && <SettingsForm initial={limits} onClose={() => setOpen(false)} />}
     </Shell>
   );

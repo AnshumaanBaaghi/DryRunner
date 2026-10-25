@@ -15,7 +15,7 @@ function fmt(tl: Timeline, snap: Snapshot, v: V | undefined): string {
   return previewValue(tl, snap, v, { depth: 1, maxItems: 4, maxString: 20 });
 }
 
-function keyText(path: (string | number)[]): string {
+export function keyText(path: (string | number)[]): string {
   const k = path[0];
   if (typeof k === 'number') return `[${k}]`;
   return /^[A-Za-z_$][\w$]*$/.test(String(k)) ? `.${k}` : `[${JSON.stringify(k)}]`;

@@ -12,6 +12,7 @@ class Sq extends Base { constructor(x) { super(x); this.y = x * 2; } area() { re
 const s = new Sq(3); console.log(s.x, s.y, s.area(), s instanceof Base);`,
   privateFields: `class Counter { #n = 1; inc() { this.#n++; return this.#n; } } const c = new Counter(); console.log(c.inc(), c.inc());`,
   swapDestructuring: `const a = [3, 1, 2]; [a[0], a[1]] = [a[1], a[0]]; let x = 1, y = 2; [x, y] = [y, x]; console.log(a, x, y);`,
+  memberObjectPatterns: `const arr = [1, 2, 3]; const box = {}; ({ p: arr[2], q: { r: arr[0] } } = { p: 9, q: { r: 4 } }); ({ x: arr[1] = 7, y: box.y = 5 } = { y: 6 }); [box.z = 8] = []; console.log(arr, box);`,
   mapSetIdentity: `const m = new Map(); const key = { id: 1 }; m.set(key, [1]); m.get(key).push(2);
 const s = new Set([key]); const arr = [key]; console.log(m.get(key), s.has(key), arr.indexOf(key), arr.includes(key), m.size);`,
   closureInRecursion: `function outer(n) { let count = 0; const bump = () => { count++; }; if (n > 0) outer(n - 1); bump(); bump(); return count; } console.log(outer(3));`,

@@ -40,6 +40,23 @@ console.log(fib(2));`);
     expect(describeStep(tl, print)).toMatchObject({ title: 'Printed: 1', chain: ['console.log(fib(2))', 'console.log(1)'] });
   });
 
+  it('narrates destructuring: swaps, several targets and member targets', async () => {
+    const tl = await timelineOf(`const arr = [5, 1, 4];
+[arr[0], arr[1]] = [arr[1], arr[0]];
+const [a, b] = [7, 8];
+let x = 1, y = 2;
+[x, y] = [y, x];
+({ p: arr[2] } = { p: 9 });`);
+    const at = (line: number) => describeStep(tl, tl.steps.findIndex((s) => s.kind === 'stmt' && s.line === line));
+    expect(at(2)).toMatchObject({
+      title: 'Swapped arr[0] and arr[1]: 5 ↔ 1',
+      chain: ['[arr[0], arr[1]] = [arr[1], arr[0]]', '[arr[0], arr[1]] = [1, 5]'],
+    });
+    expect(at(3).title).toBe('Declared a = 7, b = 8');
+    expect(at(5).title).toBe('Assigned x: 1 → 2, y: 2 → 1');
+    expect(at(6).title).toBe('Assigned arr[2]: 4 → 9');
+  });
+
   it('explains limits at the end', async () => {
     const tl = await timelineOf('while (true) {}', { maxSteps: 50 });
     expect(describeStep(tl, tl.steps.length - 1).title).toMatch(/step limit/);

@@ -1,9 +1,10 @@
 /** Floating card describing the current step in plain English plus its evaluation chain. */
 import clsx from 'clsx';
-import { AlertTriangle, ArrowRight, CircleCheck, CircleX, CornerDownLeft, Info, PhoneCall, RotateCw, Terminal } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Box, CircleCheck, CircleX, CornerDownLeft, Info, PhoneCall, RotateCw, Terminal } from 'lucide-react';
 import type { Tone } from '../../engine/describe/narrate';
 import { useRun } from '../../state/runStore';
 import { useDescription, useLoopStatus, useStepView } from '../../state/selectors';
+import { useVizNotes } from '../../state/vizStore';
 
 const TONE: Record<Tone, { icon: typeof Info; color: string }> = {
   info: { icon: Info, color: 'text-ink-dim' },
@@ -20,6 +21,7 @@ export function Hud() {
   const view = useStepView();
   const desc = useDescription(view);
   const loops = useLoopStatus(view);
+  const notes = useVizNotes(view);
   const compileError = useRun((s) => s.compileError);
 
   if (compileError) {
@@ -58,6 +60,15 @@ export function Hud() {
                 <span key={k} className="inline-flex items-center gap-1 rounded-full border border-hl-window/30 bg-hl-window/10 px-2 py-0.5 text-[11px] text-hl-window">
                   <RotateCw size={11} /> Loop at line {l.line} — iteration {l.iteration}
                   {l.counters.length > 0 && <span className="font-mono text-ink"> · {l.counters.map(([n, v]) => `${n} = ${v}`).join(', ')}</span>}
+                </span>
+              ))}
+            </div>
+          )}
+          {notes.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5" data-testid="hud-viz">
+              {notes.map((n, k) => (
+                <span key={k} className="inline-flex items-center gap-1 rounded-full border border-hl-frontier/30 bg-hl-frontier/10 px-2 py-0.5 text-[11px] text-hl-frontier">
+                  <Box size={11} /> {n}
                 </span>
               ))}
             </div>

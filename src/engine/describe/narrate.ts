@@ -4,7 +4,8 @@ import type { CondEvent, ReturnEvent } from '../types/trace';
 import type { V } from '../types/values';
 import { frameById, visibleVars } from '../timeline/scope';
 import type { Snapshot, StepRecord, Timeline, VarChange } from '../timeline/types';
-import { previewValue } from '../timeline/values';
+import { previewValue, refId } from '../timeline/values';
+import { keyText } from './changes';
 import { exprTree, indexForm, subMap, tidy, valueForm } from './exprRender';
 
 export type Tone = 'info' | 'call' | 'return' | 'true' | 'false' | 'error' | 'end' | 'warn';
@@ -62,6 +63,34 @@ function lastVarChange(tl: Timeline, i: number, name: string): VarChange | undef
   return undefined;
 }
 
+/** Destructuring assigns several targets at once: name each change (and call a two-slot exchange a swap). */
+function patternTitle(tl: Timeline, i: number, step: StepRecord, snap: Snapshot, declared: boolean): string {
+  const fmt = fmtFor(tl, snap);
+  const diff = tl.diffs[i];
+  const names = new Map<number, string>();
+  for (const f of [frameById(snap, step.callId), snap.frames.first()]) {
+    for (const v of f ? visibleVars(tl, f) : []) {
+      const id = refId(v.slot.v);
+      if (id !== null && !names.has(id)) names.set(id, v.name);
+    }
+  }
+  const sets = (diff?.heap ?? []).filter((h) => h.op === 'set');
+  const label = (h: (typeof sets)[number]) => `${names.get(h.id) ?? 'object'}${keyText(h.path)}`;
+  const same = (a: V | undefined, b: V | undefined) => JSON.stringify(a) === JSON.stringify(b);
+  if (sets.length === 2 && sets[0].id === sets[1].id && same(sets[0].old, sets[1].value) && same(sets[1].old, sets[0].value)) {
+    return `Swapped ${label(sets[0])} and ${label(sets[1])}: ${fmt(sets[0].old)} ↔ ${fmt(sets[1].old)}`;
+  }
+  const parts = [
+    ...(diff?.vars ?? []).map((c) => {
+      const name = tl.meta.bindings[c.bid]?.name ?? '?';
+      return c.kind === 'changed' && c.old !== undefined ? `${name}: ${fmt(c.old)} → ${fmt(c.value)}` : `${name} = ${fmt(c.value)}`;
+    }),
+    ...sets.map((h) => (h.old !== undefined ? `${label(h)}: ${fmt(h.old)} → ${fmt(h.value)}` : `${label(h)} = ${fmt(h.value)}`)),
+  ];
+  const list = `${parts.slice(0, 4).join(', ')}${parts.length > 4 ? ', …' : ''}`;
+  return `${declared ? 'Declared' : 'Assigned'} ${list || 'nothing new'}`;
+}
+
 function assignment(tl: Timeline, i: number, step: StepRecord, shape: AssignShape, snap: Snapshot): StepDescription {
   const fmt = fmtFor(tl, snap);
   const values = subMap(step.ev && 'sub' in step.ev ? step.ev.sub : undefined);
@@ -103,6 +132,9 @@ function assignment(tl: Timeline, i: number, step: StepRecord, shape: AssignShap
   } else if (shape.op === '=' && !shape.value) {
     chain = [display];
     title = `${targetSrc} declared (undefined)`;
+  } else if (/^[[{]/.test(targetSrc)) {
+    chain = chainOf([display, rhs ? `${targetIdx} = ${rhs}` : targetIdx]);
+    title = patternTitle(tl, i, step, snap, Boolean(declKw));
   } else {
     const evaluated = rhs && rhs !== nv ? `${targetIdx} = ${rhs} = ${nv}` : `${targetIdx} = ${nv}`;
     chain = chainOf([display, evaluated]);

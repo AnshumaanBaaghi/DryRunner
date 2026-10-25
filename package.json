@@ -17,7 +17,6 @@
   "dependencies": {
     "@babel/standalone": "^8.0.9",
     "@monaco-editor/react": "^4.7.0",
-    "@pmndrs/assets": "^1.7.0",
     "@react-spring/three": "^10.1.2",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
@@ -38,6 +37,7 @@
     "react-dom": "~19.3.1",
     "react-resizable-panels": "^4.15.0",
     "three": "^0.186.1",
+    "troika-three-text": "^0.52.5",
     "zustand": "^5.0.16"
   },
   "devDependencies": {
@@ -59,6 +59,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
+    "opentype.js": "^2.0.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",

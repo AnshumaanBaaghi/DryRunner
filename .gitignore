@@ -1,0 +1,25 @@
+# dependencies & build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# test artifacts
+test-results/
+playwright-report/
+blob-report/
+tests/e2e/__screenshots__/
+
+# logs & OS noise
+*.log
+.DS_Store
+
+# env files
+.env
+.env.*
+
+# ruflo / claude-flow runtime state
+.claude-flow/metrics/
+.claude-flow/data/
+.claude-flow/logs/
+.claude-flow/sessions/

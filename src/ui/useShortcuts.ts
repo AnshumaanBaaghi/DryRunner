@@ -4,6 +4,8 @@
  */
 import { useEffect } from 'react';
 import { usePlayback } from '../state/playbackStore';
+import { useUi } from '../state/uiStore';
+import { exitStageFullscreen, toggleStageFullscreen } from './stage/fullscreen';
 
 const OWN_KEYS = '.monaco-editor, [role="dialog"], [role="menu"], [role="listbox"], [role="slider"], [role="combobox"]';
 
@@ -43,6 +45,15 @@ export function useShortcuts(): void {
         case 'n':
         case 'N':
           pb.nextIter();
+          break;
+        case 'f':
+        case 'F':
+          toggleStageFullscreen();
+          break;
+        case 'Escape':
+          // the browser leaves its own full screen on Esc; the fill-the-window mode needs this
+          if (useUi.getState().stageFullscreen === 'off') handled = false;
+          else exitStageFullscreen();
           break;
         default:
           handled = false;

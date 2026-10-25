@@ -18,6 +18,9 @@ import { loadJSON, saveJSON } from './storage';
 
 export type Quality = 'high' | 'low';
 
+/** px the stage's chips and toolbar cover at the bottom of the stage */
+export const CONTROLS_INSET = 48;
+
 /** A variable the user asked to see with a given view. */
 export interface Binding {
   vizId: string;
@@ -51,8 +54,11 @@ interface VizState {
   viewNonce: number;
   /** px the HUD covers at the top of the stage (largest seen) — the camera frames the scene below it */
   hudInset: number;
+  /** px the stage controls cover at the bottom (in full screen the playback bar sits there too) */
+  bottomInset: number;
   setQuality(q: Quality): void;
   setHudInset(px: number): void;
+  setBottomInset(px: number): void;
   setFollow(on: boolean): void;
   resetView(): void;
   /** make a view the main one (null: automatic) */
@@ -107,9 +113,13 @@ export const useViz = create<VizState>((set, get) => {
     follow: saved.follow ?? true,
     viewNonce: 0,
     hudInset: 0,
+    bottomInset: CONTROLS_INSET,
     setQuality: (quality) => set({ quality }),
     setHudInset(px) {
       if (px > get().hudInset + 4) set({ hudInset: px });
+    },
+    setBottomInset(px) {
+      if (px !== get().bottomInset) set({ bottomInset: px });
     },
     setFollow: (follow) => set({ follow }),
     resetView: () => set({ viewNonce: get().viewNonce + 1 }),

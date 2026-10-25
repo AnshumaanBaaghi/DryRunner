@@ -1,11 +1,18 @@
-/** Center stage: the lazily loaded 3D canvas with the HUD and stage controls on top. */
-import { AlertTriangle, Loader2, MousePointerClick } from 'lucide-react';
+/**
+ * Center stage: the lazily loaded 3D canvas with the HUD and stage controls on top. In full screen it
+ * covers the window and carries its own playback bar.
+ */
+import clsx from 'clsx';
+import { AlertTriangle, Loader2, Minimize2, MousePointerClick } from 'lucide-react';
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRun } from '../../state/runStore';
-import { useViz } from '../../state/vizStore';
+import { useUi } from '../../state/uiStore';
+import { CONTROLS_INSET, useViz } from '../../state/vizStore';
 import { ErrorBoundary } from '../ErrorBoundary';
 import { Hud } from '../hud/Hud';
-import { Button } from '../primitives';
+import { PlaybackBar } from '../playback/PlaybackBar';
+import { Button, IconButton } from '../primitives';
+import { exitStageFullscreen } from './fullscreen';
 import { StageToolbar } from './StageToolbar';
 
 const Stage = lazy(() => import('../../scene/Stage'));
@@ -55,8 +62,29 @@ function useHudInset() {
   return ref;
 }
 
+/** In full screen the playback bar sits under the stage controls; the camera keeps the scene above both. */
+function useBarInset(on: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!on || !el) return;
+    const { setBottomInset } = useViz.getState();
+    const report = () => setBottomInset(CONTROLS_INSET + 8 + el.offsetHeight);
+    const ro = new ResizeObserver(report);
+    ro.observe(el);
+    report();
+    return () => {
+      ro.disconnect();
+      setBottomInset(CONTROLS_INSET);
+    };
+  }, [on]);
+  return ref;
+}
+
 export function StageArea() {
   const hudRef = useHudInset();
+  const fullscreen = useUi((s) => s.stageFullscreen);
+  const barRef = useBarInset(fullscreen !== 'off');
   const timeline = useRun((s) => s.timeline);
   const status = useRun((s) => s.status);
   const [epoch, setEpoch] = useState(0);
@@ -66,7 +94,8 @@ export function StageArea() {
     setEpoch((e) => e + 1);
   };
   return (
-    <div className="relative h-full min-h-0 overflow-hidden bg-bg" data-testid="stage">
+    <div className={clsx('overflow-hidden bg-bg', fullscreen === 'off' ? 'relative h-full min-h-0' : 'fixed inset-0 z-40')}
+      data-testid="stage" data-fullscreen={fullscreen}>
       {!timeline ? (
         <>
           <Backdrop />
@@ -90,10 +119,24 @@ export function StageArea() {
           </Suspense>
         </ErrorBoundary>
       )}
-      <div ref={hudRef} className="pointer-events-none absolute inset-x-3 top-3 flex">
+      <div ref={hudRef} className={clsx('pointer-events-none absolute inset-x-3 top-3 flex', fullscreen !== 'off' && 'pr-11')}>
         <Hud />
       </div>
-      {timeline && !lost && <StageToolbar />}
+      {fullscreen !== 'off' && (
+        <div className="absolute right-3 top-3 rounded-lg border border-line bg-panel/85 p-0.5 backdrop-blur">
+          <IconButton label="Exit full screen" shortcut="Esc" onClick={exitStageFullscreen} data-testid="stage-exit-fullscreen">
+            <Minimize2 size={15} />
+          </IconButton>
+        </div>
+      )}
+      <div className="pointer-events-none absolute inset-x-3 bottom-3 flex flex-col gap-2">
+        {timeline && !lost && <StageToolbar />}
+        {fullscreen !== 'off' && (
+          <div ref={barRef} className="pointer-events-auto">
+            <PlaybackBar variant="stage" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

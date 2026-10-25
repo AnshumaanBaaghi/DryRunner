@@ -1,9 +1,11 @@
-/** Camera and render-quality controls over the canvas, plus chips naming the detected visualizations. */
+/** Camera, render-quality and full-screen controls over the canvas, plus chips naming the detected visualizations. */
 import clsx from 'clsx';
-import { Crosshair, Scan, Sparkles } from 'lucide-react';
+import { Crosshair, Maximize2, Scan, Sparkles } from 'lucide-react';
+import { useUi } from '../../state/uiStore';
 import { useViz } from '../../state/vizStore';
 import { visualizerById } from '../../visualizers/registry';
 import { IconButton } from '../primitives';
+import { enterStageFullscreen } from './fullscreen';
 
 const MODE_TEXT: Record<string, string> = {
   'iteration-space': 'nested loops', window: 'sliding window', 'two-pointers': 'two pointers', 'binary-search': 'binary search',
@@ -15,10 +17,11 @@ export function StageToolbar() {
   const follow = useViz((s) => s.follow);
   const quality = useViz((s) => s.quality);
   const active = useViz((s) => s.active);
+  const fullscreen = useUi((s) => s.stageFullscreen !== 'off');
   return (
-    <>
+    <div className="pointer-events-none flex items-end gap-2">
       {active.length > 0 && (
-        <div className="pointer-events-none absolute bottom-3 left-3 flex max-w-[60%] flex-wrap gap-1.5" data-testid="stage-viz">
+        <div className="flex max-w-[60%] flex-wrap gap-1.5" data-testid="stage-viz">
           {active.map((d) => {
             const mode = d.mode ? MODE_TEXT[d.mode] : undefined;
             return (
@@ -33,7 +36,7 @@ export function StageToolbar() {
           })}
         </div>
       )}
-      <div className="absolute bottom-3 right-3 flex gap-0.5 rounded-lg border border-line bg-panel/85 p-0.5 backdrop-blur" data-testid="stage-toolbar">
+      <div className="pointer-events-auto ml-auto flex gap-0.5 rounded-lg border border-line bg-panel/85 p-0.5 backdrop-blur" data-testid="stage-toolbar">
         <IconButton label="Reset view" onClick={() => useViz.getState().resetView()}>
           <Scan size={15} />
         </IconButton>
@@ -45,7 +48,18 @@ export function StageToolbar() {
           aria-pressed={quality === 'high'} onClick={() => useViz.getState().setQuality(quality === 'high' ? 'low' : 'high')}>
           <Sparkles size={15} />
         </IconButton>
+        {!fullscreen && (
+          <IconButton label="Full screen" shortcut="F" data-testid="stage-fullscreen"
+            onClick={(e) => {
+              // the request uses up the click's user activation; Monaco's Safari clipboard workaround (a click
+              // listener on <body>) needs it too and logs errors without it, so the click stops here
+              e.stopPropagation();
+              enterStageFullscreen();
+            }}>
+            <Maximize2 size={15} />
+          </IconButton>
+        )}
       </div>
-    </>
+    </div>
   );
 }

@@ -42,6 +42,7 @@ export function CameraRig() {
   const tilt = useViz((s) => visualizerById(s.active.find((d) => d.role === 'primary')?.vizId ?? '')?.cameraTilt ?? DEFAULT_TILT);
   const viewNonce = useViz((s) => s.viewNonce);
   const hudInset = useViz((s) => s.hudInset);
+  const bottomInset = useViz((s) => s.bottomInset);
   const goal = useRef<Goal | null>(null);
   const pausedUntil = useRef(0);
   const fitUntil = useRef(0);
@@ -82,7 +83,7 @@ export function CameraRig() {
     const extent = max.clone().sub(min);
     // keep the scene inside the band between the HUD (top) and the stage controls (bottom)
     const top = Math.min(0.6, (hudInset + 8) / Math.max(1, height));
-    const bottom = Math.min(0.2, 48 / Math.max(1, height));
+    const bottom = Math.min(0.3, bottomInset / Math.max(1, height));
     const band = Math.max(0.35, 1 - top - bottom);
     const fit = Math.max(6, fitDistance([extent.x + 2.5, (extent.y + 1.2) / band, extent.z], camera.fov, width / Math.max(1, height)) * 1.12);
     const comfort = Math.max(12, READABLE * height);
@@ -103,7 +104,7 @@ export function CameraRig() {
     framed.current = true;
     resetAngle.current = false;
     invalidate();
-  }, [bounds, complete, focus, follow, viewNonce, hudInset, tilt, fitDone, width, height, camera, invalidate]);
+  }, [bounds, complete, focus, follow, viewNonce, hudInset, bottomInset, tilt, fitDone, width, height, camera, invalidate]);
 
   useEffect(() => {
     const c = controls.current;

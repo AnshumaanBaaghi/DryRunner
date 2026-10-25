@@ -16,6 +16,7 @@ const SHORTCUTS: [string, string][] = [
   ['↓', 'Step into'],
   ['↑', 'Step out'],
   ['N', 'Next iteration'],
+  ['F', 'Full-screen 3D view'],
   ['⌘/Ctrl ↵', 'Visualize'],
   ['F9', 'Toggle breakpoint (editor)'],
 ];

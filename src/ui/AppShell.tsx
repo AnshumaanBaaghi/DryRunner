@@ -2,6 +2,7 @@
 import clsx from 'clsx';
 import { X } from 'lucide-react';
 import { Tabs } from 'radix-ui';
+import { useEffect, useState } from 'react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import { useMediaQuery } from '../state/selectors';
 import { useUi, type MobileTab } from '../state/uiStore';
@@ -9,6 +10,7 @@ import { ConsolePanel } from './console/ConsolePanel';
 import { Dialogs } from './dialogs/Dialogs';
 import { LazyCodeEditor } from './editor/LazyCodeEditor';
 import { PlaybackBar } from './playback/PlaybackBar';
+import { watchFullscreen } from './stage/fullscreen';
 import { StageArea } from './stage/StageArea';
 import { TopBar } from './toolbar/TopBar';
 import { TraceTable } from './traceTable/TraceTable';
@@ -92,7 +94,13 @@ function MobileLayout() {
 
 export function AppShell() {
   useShortcuts();
-  const mobile = useMediaQuery('(max-width: 899px)');
+  useEffect(() => watchFullscreen(), []);
+  const narrow = useMediaQuery('(max-width: 899px)');
+  const fullscreen = useUi((s) => s.stageFullscreen !== 'off');
+  // the full-screen stage still lives in its layout and full screen resizes the viewport: switching
+  // layouts would restart the 3D view, so the layout waits until full screen ends
+  const [mobile, setMobile] = useState(narrow);
+  if (!fullscreen && mobile !== narrow) setMobile(narrow);
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <TopBar />

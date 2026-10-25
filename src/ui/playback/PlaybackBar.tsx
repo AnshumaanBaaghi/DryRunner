@@ -79,7 +79,9 @@ function Scrubber() {
   );
 }
 
-export function PlaybackBar() {
+/** `stage`: the floating bar inside the full-screen 3D view (no trace-table toggle, its own test ids). */
+export function PlaybackBar({ variant = 'app' }: { variant?: 'app' | 'stage' }) {
+  const tid = (id: string) => (variant === 'stage' ? `fs-${id}` : id);
   const view = useStepView();
   const playing = usePlayback((s) => s.playing);
   const pb = usePlayback.getState();
@@ -92,19 +94,21 @@ export function PlaybackBar() {
   const atStart = !view || view.i === 0;
   const atEnd = !view || view.i >= view.last;
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-t border-line bg-panel px-2 py-1 sm:h-12 sm:flex-nowrap sm:gap-3 sm:px-3 sm:py-0" data-testid="playback">
+    <div className={clsx('flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 px-2 py-1 sm:h-12 sm:flex-nowrap sm:gap-3 sm:px-3 sm:py-0',
+      variant === 'stage' ? 'rounded-xl border border-line-strong bg-panel/90 shadow-2xl backdrop-blur' : 'border-t border-line bg-panel')}
+      data-testid={tid('playback')}>
       <div className="flex w-full items-center justify-between sm:w-auto sm:justify-start">
         <IconButton label="Go to start" onClick={pb.toStart} disabled={atStart}><SkipBack size={16} /></IconButton>
-        <IconButton label="Step back" shortcut="←" onClick={pb.back} disabled={atStart} data-testid="step-back"><StepBack size={16} /></IconButton>
-        <IconButton label={playing ? 'Pause' : 'Play'} shortcut="Space" onClick={pb.toggle} disabled={!has} data-testid="play"
+        <IconButton label="Step back" shortcut="←" onClick={pb.back} disabled={atStart} data-testid={tid('step-back')}><StepBack size={16} /></IconButton>
+        <IconButton label={playing ? 'Pause' : 'Play'} shortcut="Space" onClick={pb.toggle} disabled={!has} data-testid={tid('play')}
           className="h-9 w-9 bg-raised text-ink hover:bg-line-strong">
           {playing ? <Pause size={17} /> : <Play size={17} />}
         </IconButton>
-        <IconButton label="Step" shortcut="→" onClick={pb.forward} disabled={atEnd} data-testid="step-forward"><StepForward size={16} /></IconButton>
-        <IconButton label="Step over" shortcut="⇧→" onClick={pb.over} disabled={atEnd} data-testid="step-over"><Redo2 size={16} /></IconButton>
-        <IconButton label="Step into" shortcut="↓" onClick={pb.into} disabled={atEnd} data-testid="step-into"><ArrowDownToLine size={16} /></IconButton>
-        <IconButton label="Step out" shortcut="↑" onClick={pb.out} disabled={atEnd} data-testid="step-out"><ArrowUpFromLine size={16} /></IconButton>
-        <IconButton label="Next iteration" shortcut="N" onClick={pb.nextIter} disabled={atEnd} data-testid="next-iter"><Repeat size={16} /></IconButton>
+        <IconButton label="Step" shortcut="→" onClick={pb.forward} disabled={atEnd} data-testid={tid('step-forward')}><StepForward size={16} /></IconButton>
+        <IconButton label="Step over" shortcut="⇧→" onClick={pb.over} disabled={atEnd} data-testid={tid('step-over')}><Redo2 size={16} /></IconButton>
+        <IconButton label="Step into" shortcut="↓" onClick={pb.into} disabled={atEnd} data-testid={tid('step-into')}><ArrowDownToLine size={16} /></IconButton>
+        <IconButton label="Step out" shortcut="↑" onClick={pb.out} disabled={atEnd} data-testid={tid('step-out')}><ArrowUpFromLine size={16} /></IconButton>
+        <IconButton label="Next iteration" shortcut="N" onClick={pb.nextIter} disabled={atEnd} data-testid={tid('next-iter')}><Repeat size={16} /></IconButton>
         <IconButton label="Go to end" onClick={pb.toEnd} disabled={atEnd}><SkipForward size={16} /></IconButton>
       </div>
       <div className="hidden md:block"><SpeedControl /></div>
@@ -119,12 +123,14 @@ export function PlaybackBar() {
           {status === 'running' ? 'running…' : runStatus === 'limit-steps' ? 'step limit' : runStatus === 'timeout' ? 'timeout'
             : runStatus === 'limit-depth' ? 'depth limit' : runStatus === 'error' ? 'error' : ''}
         </span>
-        <span className="font-mono text-xs text-ink-dim tabular-nums" data-testid="step-counter">
+        <span className="font-mono text-xs text-ink-dim tabular-nums" data-testid={tid('step-counter')}>
           Step {view?.i ?? 0} / {view?.last ?? 0}
         </span>
-        <IconButton label={tableOpen ? 'Hide trace table' : 'Show trace table'} onClick={() => setTableOpen(!tableOpen)} active={tableOpen} data-testid="toggle-table">
-          <Table2 size={16} />
-        </IconButton>
+        {variant === 'app' && (
+          <IconButton label={tableOpen ? 'Hide trace table' : 'Show trace table'} onClick={() => setTableOpen(!tableOpen)} active={tableOpen} data-testid="toggle-table">
+            <Table2 size={16} />
+          </IconButton>
+        )}
       </div>
     </div>
   );

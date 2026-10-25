@@ -120,6 +120,73 @@ test.describe('3D stage', () => {
     expect(errors).toEqual([]);
   });
 
+  test('full screen shows the 3D view with its own playback bar', async ({ page }, info) => {
+    const { errors } = await openApp(page);
+    await selectExample(page, 'bubble-sort');
+    const stage = page.getByTestId('stage');
+    await expect(stage).toHaveAttribute('data-fullscreen', 'off');
+    await page.getByTestId('stage-fullscreen').click();
+    await expect(stage).toHaveAttribute('data-fullscreen', /^(browser|window)$/);
+    console.log(`[fullscreen] ${info.project.name}: ${await stage.getAttribute('data-fullscreen')}`);
+    await expect(page.getByTestId('fs-playback')).toBeVisible();
+    const view = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    const box = (await stage.boundingBox())!;
+    expect([box.x, box.y, Math.round(box.width), Math.round(box.height)]).toEqual([0, 0, view.w, view.h]);
+    // its bar and the keyboard both step
+    await page.getByTestId('fs-step-forward').click();
+    await expect(page.getByTestId('fs-step-counter')).toHaveText(/^Step 1 \//);
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByTestId('fs-step-counter')).toHaveText(/^Step 2 \//);
+    // tooltips are drawn above the full-screen stage
+    await page.mouse.move(5, 5);
+    await page.getByTestId('fs-step-back').hover();
+    const tip = page.locator('[data-radix-popper-content-wrapper]').last();
+    await expect(tip).toContainText('Step back');
+    expect(await tip.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+    })).toBe(true);
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `tests/e2e/__screenshots__/${info.project.name}/fullscreen-bubble-sort.png` });
+    await page.getByTestId('stage-exit-fullscreen').click();
+    await expect(stage).toHaveAttribute('data-fullscreen', 'off');
+    await expect(page.getByTestId('fs-playback')).toHaveCount(0);
+    const inBrowserFullscreen = () => page.evaluate(() => {
+      const d = document as Document & { webkitFullscreenElement?: Element | null };
+      return Boolean(d.fullscreenElement ?? d.webkitFullscreenElement);
+    });
+    await expect.poll(inBrowserFullscreen).toBe(false);
+    expect((await counter(page)).step).toBe(2);
+    // F enters, Esc leaves
+    await page.keyboard.press('f');
+    await expect(stage).toHaveAttribute('data-fullscreen', /^(browser|window)$/);
+    await page.keyboard.press('Escape');
+    await expect(stage).toHaveAttribute('data-fullscreen', 'off');
+    await expect.poll(inBrowserFullscreen).toBe(false);
+    expect(errors).toEqual([]);
+  });
+
+  test('full screen on a phone keeps the playback bar on screen', async ({ page }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const { errors } = await openApp(page);
+    await selectExample(page, 'binary-search');
+    await page.getByTestId('stage-fullscreen').click();
+    await expect(page.getByTestId('fs-playback')).toBeVisible();
+    const view = await page.evaluate(() => ({ w: window.innerWidth, h: window.innerHeight }));
+    const bar = (await page.getByTestId('fs-playback').boundingBox())!;
+    expect(bar.x).toBeGreaterThanOrEqual(0);
+    expect(bar.x + bar.width).toBeLessThanOrEqual(view.w);
+    expect(bar.y + bar.height).toBeLessThanOrEqual(view.h);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(view.w);
+    await page.getByTestId('fs-step-forward').click();
+    await expect(page.getByTestId('fs-step-counter')).toHaveText(/^Step 1 \//);
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `tests/e2e/__screenshots__/${info.project.name}/fullscreen-phone-binary-search.png` });
+    await page.getByTestId('stage-exit-fullscreen').click();
+    await expect(page.getByTestId('stage')).toHaveAttribute('data-fullscreen', 'off');
+    expect(errors).toEqual([]);
+  });
+
   test('a runaway loop still gets a stage for its partial trace', async ({ page }) => {
     const { errors } = await openApp(page);
     await runCode(page, 'let n = 0;\nwhile (true) {\n  n++;\n}');

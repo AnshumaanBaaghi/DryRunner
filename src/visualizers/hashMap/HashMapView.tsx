@@ -4,10 +4,11 @@
  * old → new, a removed one rises and fades, a lookup flashes the card it finds amber or pops a red
  * "miss" chip on the size line. Stepping back plays the undone step backwards. Centered on x = 0.
  */
-import { animated, useSpring, type SpringValue } from '@react-spring/three';
+import { animated, useSpring } from '@react-spring/three';
 import { RoundedBox } from '@react-three/drei';
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { useAnimTiming, useHighlight, type AnimTiming } from '../../scene/anim';
+import { useDrop } from '../../scene/drop';
 import { useFocusPoint } from '../../scene/focus';
 import { useReportSize } from '../../scene/layout';
 import { Block } from '../../scene/primitives/Block';
@@ -28,23 +29,9 @@ const AnimatedLabel = animated(Label);
 /** how far an added card drops in from (and a removed one rises to) */
 const DROP = 0.8;
 
-/** Replays a drop-in (from DROP above) whenever `active` turns on for a new step key. */
-function useDrop(key: string, active: boolean, timing: AnimTiming): SpringValue<number> {
-  // a card mounted by an addition starts up high, so its first frame is not drawn in place
-  const [spring, api] = useSpring(() => ({ y: active && !timing.immediate ? DROP : 0 }));
-  const last = useRef<string | null>(null);
-  useEffect(() => {
-    if (!active || last.current === key) return;
-    last.current = key;
-    if (timing.immediate) api.start({ y: 0, immediate: true });
-    else api.start({ from: { y: DROP }, to: { y: 0 }, config: timing.config });
-  }, [key, active, api, timing]);
-  return spring.y;
-}
-
 function HashCard({ card, x, y, w, stepKey, timing }: { card: CardModel; x: number; y: number; w: number; stepKey: string; timing: AnimTiming }) {
   const pulse = usePulse(stepKey, card.pulse);
-  const drop = useDrop(stepKey, card.entered, timing);
+  const drop = useDrop(stepKey, card.entered, timing, DROP);
   return (
     <group>
       <animated.group position-y={drop}>

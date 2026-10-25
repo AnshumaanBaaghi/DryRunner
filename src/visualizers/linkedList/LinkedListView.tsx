@@ -5,9 +5,10 @@
  * the arrow it replaced fades; pointer variables float above their nodes (null ones over a "null" slot
  * past the end) and new nodes drop in.
  */
-import { animated, useSpring, type SpringValue } from '@react-spring/three';
-import { useEffect, useMemo, useRef } from 'react';
+import { animated, useSpring } from '@react-spring/three';
+import { useMemo } from 'react';
 import { useAnimTiming, useHighlight, type AnimTiming } from '../../scene/anim';
+import { useDrop } from '../../scene/drop';
 import { useFocusPoint } from '../../scene/focus';
 import { useReportSize } from '../../scene/layout';
 import { Arrow } from '../../scene/primitives/Arrow';
@@ -26,22 +27,6 @@ type LinkKey = LinkChange['key'];
 const AnimatedArrow = animated(Arrow);
 const LINK_COLOR: Record<LinkKey, string> = { next: COLORS.visited, prev: COLORS.frontier };
 const LINK_RADIUS: Record<LinkKey, number> = { next: 0.04, prev: 0.03 };
-/** how far a new node drops in from */
-const DROP = 0.9;
-
-/** Replays a drop-in (from DROP above) whenever `active` turns on for a new step key. */
-function useDrop(key: string, active: boolean, timing: AnimTiming): SpringValue<number> {
-  // a node mounted by its creation starts up high, so its first frame is not drawn in place
-  const [spring, api] = useSpring(() => ({ y: active && !timing.immediate ? DROP : 0 }));
-  const last = useRef<string | null>(null);
-  useEffect(() => {
-    if (!active || last.current === key) return;
-    last.current = key;
-    if (timing.immediate) api.start({ y: 0, immediate: true });
-    else api.start({ from: { y: DROP }, to: { y: 0 }, config: timing.config });
-  }, [key, active, api, timing]);
-  return spring.y;
-}
 
 function NodeBlock({ node, x, y, stepKey, timing }: { node: NodeModel; x: number; y: number; stepKey: string; timing: AnimTiming }) {
   const pulse = usePulse(stepKey, node.pulse);

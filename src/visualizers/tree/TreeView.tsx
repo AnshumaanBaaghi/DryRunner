@@ -5,9 +5,10 @@
  * that reached a missing child shows "null" there, the link written this step glows orange, pointer
  * variables float above their nodes and the visit order fills a strip of blocks under the tree.
  */
-import { animated, useSpring, type SpringValue } from '@react-spring/three';
-import { useEffect, useMemo, useRef } from 'react';
+import { animated } from '@react-spring/three';
+import { useMemo } from 'react';
 import { useAnimTiming, useHighlight, type AnimTiming } from '../../scene/anim';
+import { useDrop } from '../../scene/drop';
 import { useFocusPoint } from '../../scene/focus';
 import { useReportSize } from '../../scene/layout';
 import { Block } from '../../scene/primitives/Block';
@@ -23,26 +24,10 @@ import {
   buildTreeModel, MARKER_LIFT, NODE_R, STRIP_BLOCK, STRIP_PITCH, VISITED_COLOR, type NodeModel, type StripModel, type TreeFrame,
 } from './model';
 
-/** how far a new node drops in from */
-const DROP = 0.9;
 const EDGE_Z = -0.02;
 
 /** font size that fits a label on a node / block face (a character is about 0.6 × the size wide) */
 const fit = (label: string, width: number, max: number) => Math.min(max, (width - 0.14) / (0.6 * Math.max(1, label.length)));
-
-/** Replays a drop-in (from DROP above) whenever `active` turns on for a new step key. */
-function useDrop(key: string, active: boolean, timing: AnimTiming): SpringValue<number> {
-  // a node mounted by its creation starts up high, so its first frame is not drawn in place
-  const [spring, api] = useSpring(() => ({ y: active && !timing.immediate ? DROP : 0 }));
-  const last = useRef<string | null>(null);
-  useEffect(() => {
-    if (!active || last.current === key) return;
-    last.current = key;
-    if (timing.immediate) api.start({ y: 0, immediate: true });
-    else api.start({ from: { y: DROP }, to: { y: 0 }, config: timing.config });
-  }, [key, active, api, timing]);
-  return spring.y;
-}
 
 function TreeNodeView({ node, stepKey, timing }: { node: NodeModel; stepKey: string; timing: AnimTiming }) {
   const current = node.state === 'current';

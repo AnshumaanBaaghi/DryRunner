@@ -81,7 +81,7 @@ export function CameraRig() {
     const center = min.clone().add(max).multiplyScalar(0.5);
     const extent = max.clone().sub(min);
     // keep the scene inside the band between the HUD (top) and the stage controls (bottom)
-    const top = Math.min(0.45, (hudInset + 8) / Math.max(1, height));
+    const top = Math.min(0.6, (hudInset + 8) / Math.max(1, height));
     const bottom = Math.min(0.2, 48 / Math.max(1, height));
     const band = Math.max(0.35, 1 - top - bottom);
     const fit = Math.max(6, fitDistance([extent.x + 2.5, (extent.y + 1.2) / band, extent.z], camera.fov, width / Math.max(1, height)) * 1.12);

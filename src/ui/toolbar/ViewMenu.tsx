@@ -89,10 +89,10 @@ export function ViewMenu() {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button data-testid="view-trigger" disabled={!timeline} className="hidden sm:inline-flex">
-          <Layers size={14} />
-          <span>View: {custom ? 'custom' : 'auto'}</span>
-          <ChevronDown size={14} className="text-ink-faint" />
+        <Button data-testid="view-trigger" disabled={!timeline} aria-label="View" className="px-2 sm:px-3">
+          <Layers size={14} className={custom ? 'text-hl-current' : undefined} />
+          <span className="hidden sm:inline">View: {custom ? 'custom' : 'auto'}</span>
+          <ChevronDown size={14} className="hidden text-ink-faint sm:block" />
         </Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>

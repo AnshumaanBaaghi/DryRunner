@@ -3,10 +3,11 @@
  * blocks, the board as a Grid2D (placed cells raised gold, the changed cell pulsing orange, cells being
  * checked violet) and the solutions found so far.
  */
-import { animated, useSpring, type SpringValue } from '@react-spring/three';
+import { animated, useSpring } from '@react-spring/three';
 import { RoundedBox } from '@react-three/drei';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { AnimTiming } from '../../scene/anim';
+import { useDrop } from '../../scene/drop';
 import { Block } from '../../scene/primitives/Block';
 import { Grid2D, type GridMark } from '../../scene/primitives/Grid2D';
 import { Label } from '../../scene/primitives/Label';
@@ -20,23 +21,9 @@ const CHECKER = ['#1a2332', '#273449'];
 /** raise of a placed board cell (a queen) */
 const PLACED_RAISE = 0.25;
 
-/** Replays a drop-in (from DROP above) whenever `active` turns on for a new step key. */
-function useDrop(key: string, active: boolean, timing: AnimTiming): SpringValue<number> {
-  // a block mounted by a push starts up high, so its first frame is not drawn in place
-  const [spring, api] = useSpring(() => ({ y: active && !timing.immediate ? DROP : 0 }));
-  const last = useRef<string | null>(null);
-  useEffect(() => {
-    if (!active || last.current === key) return;
-    last.current = key;
-    if (timing.immediate) api.start({ y: 0, immediate: true });
-    else api.start({ from: { y: DROP }, to: { y: 0 }, config: timing.config });
-  }, [key, active, api, timing]);
-  return spring.y;
-}
-
 function SlotBlock({ x, slot, size, stepKey, timing }: { x: number; slot: SlotModel; size: number; stepKey: string; timing: AnimTiming }) {
   const pulse = usePulse(stepKey, slot.pulse);
-  const drop = useDrop(stepKey, slot.entered, timing);
+  const drop = useDrop(stepKey, slot.entered, timing, DROP);
   return (
     <group position={[x, 0, 0]}>
       <animated.group position-y={drop}>

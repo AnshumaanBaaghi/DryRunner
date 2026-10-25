@@ -1,4 +1,5 @@
 /** Camera and render-quality controls over the canvas, plus chips naming the detected visualizations. */
+import clsx from 'clsx';
 import { Crosshair, Scan, Sparkles } from 'lucide-react';
 import { useViz } from '../../state/vizStore';
 import { visualizerById } from '../../visualizers/registry';
@@ -22,7 +23,8 @@ export function StageToolbar() {
             const mode = d.mode ? MODE_TEXT[d.mode] : undefined;
             return (
               <span key={d.key} data-viz={d.vizId} data-mode={d.mode ?? ''}
-                className="rounded-full border border-line-strong bg-panel/85 px-2 py-0.5 text-[11px] text-ink-dim backdrop-blur">
+                className={clsx('rounded-full border border-line-strong bg-panel/85 px-2 py-0.5 text-[11px] text-ink-dim backdrop-blur',
+                  d.role !== 'primary' && 'max-sm:hidden')}>
                 <span className="text-ink">{visualizerById(d.vizId)?.label ?? d.vizId}</span>
                 {d.vizId !== 'scalars' && <span className="font-mono"> · {d.title}</span>}
                 {mode && <span className="text-hl-window"> · {mode}</span>}

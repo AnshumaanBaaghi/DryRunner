@@ -3,10 +3,10 @@
  * an orange pulse, the entry a cache hit reads flashes violet, stepping back over a store lifts its entry
  * out again — and the hit and entry counts underneath.
  */
-import { animated, useSpring, type SpringValue } from '@react-spring/three';
+import { animated, useSpring } from '@react-spring/three';
 import { RoundedBox } from '@react-three/drei';
-import { useEffect, useRef } from 'react';
 import type { AnimTiming } from '../../scene/anim';
+import { useDrop } from '../../scene/drop';
 import { Block } from '../../scene/primitives/Block';
 import { Label } from '../../scene/primitives/Label';
 import { COLORS, SURFACE } from '../../scene/primitives/materials';
@@ -17,20 +17,6 @@ import { CARD, NOTE_SIZE, slotCenter, STATS_SIZE, STATS_Y, TITLE_SIZE, type Cach
 const AnimatedMaterial = animated('meshPhysicalMaterial');
 /** how far a stored card drops in from (and an undone one lifts out to) */
 const DROP = 0.9;
-
-/** Replays a drop-in (from DROP above) whenever `active` turns on for a new step key. */
-function useDrop(key: string, active: boolean, timing: AnimTiming): SpringValue<number> {
-  // a card mounted by a store starts up high, so its first frame is not drawn in place
-  const [spring, api] = useSpring(() => ({ y: active && !timing.immediate ? DROP : 0 }));
-  const last = useRef<string | null>(null);
-  useEffect(() => {
-    if (!active || last.current === key) return;
-    last.current = key;
-    if (timing.immediate) api.start({ y: 0, immediate: true });
-    else api.start({ from: { y: DROP }, to: { y: 0 }, config: timing.config });
-  }, [key, active, api, timing]);
-  return spring.y;
-}
 
 function CacheCard({ card, x, y, w, stepKey, timing }: { card: CardModel; x: number; y: number; w: number; stepKey: string; timing: AnimTiming }) {
   const pulse = usePulse(stepKey, card.pulse);

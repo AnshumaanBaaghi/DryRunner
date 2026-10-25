@@ -7,7 +7,7 @@ import { useMediaQuery } from '../state/selectors';
 import { useUi, type MobileTab } from '../state/uiStore';
 import { ConsolePanel } from './console/ConsolePanel';
 import { Dialogs } from './dialogs/Dialogs';
-import { CodeEditor } from './editor/CodeEditor';
+import { LazyCodeEditor } from './editor/LazyCodeEditor';
 import { PlaybackBar } from './playback/PlaybackBar';
 import { StageArea } from './stage/StageArea';
 import { TopBar } from './toolbar/TopBar';
@@ -34,7 +34,7 @@ function DesktopLayout() {
         <Group orientation="horizontal" className="h-full">
           <Panel defaultSize="36" minSize="18">
             <Group orientation="vertical" className="h-full">
-              <Panel defaultSize="72" minSize="25"><CodeEditor /></Panel>
+              <Panel defaultSize="72" minSize="25"><LazyCodeEditor /></Panel>
               <Handle vertical />
               <Panel defaultSize="28" minSize="10"><ConsolePanel /></Panel>
             </Group>
@@ -72,7 +72,7 @@ function MobileLayout() {
             </Tabs.Trigger>
           ))}
         </Tabs.List>
-        <Tabs.Content value="code" className="min-h-0 flex-1"><CodeEditor /></Tabs.Content>
+        <Tabs.Content value="code" className="min-h-0 flex-1"><LazyCodeEditor /></Tabs.Content>
         <Tabs.Content value="vars" className="min-h-0 flex-1"><VariablesPanel /></Tabs.Content>
         <Tabs.Content value="console" className="min-h-0 flex-1"><ConsolePanel /></Tabs.Content>
       </Tabs.Root>

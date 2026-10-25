@@ -38,13 +38,13 @@ export function Hud() {
   const tone = TONE[desc.tone];
   const Icon = tone.icon;
   return (
-    <div className="pointer-events-auto max-w-[min(42rem,100%)] rounded-xl border border-line-strong bg-panel/92 p-3 shadow-2xl backdrop-blur" data-testid="hud">
+    <div className="pointer-events-auto max-w-[min(42rem,100%)] rounded-xl border border-line-strong bg-panel/92 p-2 shadow-2xl backdrop-blur sm:p-3" data-testid="hud">
       <div className="flex items-start gap-2">
         <Icon size={16} className={clsx('mt-0.5 shrink-0', tone.color)} />
         <div className="min-w-0">
-          <div className="text-sm font-medium leading-snug text-ink" data-testid="hud-title">{desc.title}</div>
+          <div className="text-[13px] font-medium leading-snug text-ink sm:text-sm" data-testid="hud-title">{desc.title}</div>
           {desc.chain.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-[12.5px]" data-testid="hud-chain">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 font-mono text-[11.5px] sm:text-[12.5px]" data-testid="hud-chain">
               {desc.chain.map((part, k) => (
                 <span key={k} className="flex items-center gap-1.5">
                   {k > 0 && <ArrowRight size={12} className="text-ink-faint" />}
@@ -55,9 +55,9 @@ export function Hud() {
             </div>
           )}
           {loops.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5" data-testid="hud-loops">
+            <div className="as-scroll mt-2 flex gap-1.5 overflow-x-auto sm:flex-wrap" data-testid="hud-loops">
               {loops.map((l, k) => (
-                <span key={k} className="inline-flex items-center gap-1 rounded-full border border-hl-window/30 bg-hl-window/10 px-2 py-0.5 text-[11px] text-hl-window">
+                <span key={k} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-hl-window/30 bg-hl-window/10 px-2 py-0.5 text-[11px] text-hl-window">
                   <RotateCw size={11} /> Loop at line {l.line} — iteration {l.iteration}
                   {l.counters.length > 0 && <span className="font-mono text-ink"> · {l.counters.map(([n, v]) => `${n} = ${v}`).join(', ')}</span>}
                 </span>
@@ -65,9 +65,9 @@ export function Hud() {
             </div>
           )}
           {notes.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5" data-testid="hud-viz">
+            <div className="as-scroll mt-2 flex gap-1.5 overflow-x-auto sm:flex-wrap" data-testid="hud-viz">
               {notes.map((n, k) => (
-                <span key={k} className="inline-flex items-center gap-1 rounded-full border border-hl-frontier/30 bg-hl-frontier/10 px-2 py-0.5 text-[11px] text-hl-frontier">
+                <span key={k} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-hl-frontier/30 bg-hl-frontier/10 px-2 py-0.5 text-[11px] text-hl-frontier">
                   <Box size={11} /> {n}
                 </span>
               ))}

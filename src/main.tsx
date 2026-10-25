@@ -7,9 +7,12 @@ import { usePlayback } from './state/playbackStore';
 import { useRun } from './state/runStore';
 import { useViz } from './state/vizStore';
 
-// dev-only hook for end-to-end tests (setting editor code reliably); absent from production builds
+// dev-only hook for end-to-end tests (setting editor code reliably, measuring); absent from production builds
 if (import.meta.env.DEV) {
-  (window as unknown as { __algoscope?: unknown }).__algoscope = { editor: useEditor, run: useRun, playback: usePlayback, viz: useViz };
+  (window as unknown as { __algoscope?: unknown }).__algoscope = {
+    editor: useEditor, run: useRun, playback: usePlayback, viz: useViz,
+    bench: (source: string) => import('./devtools').then((m) => m.bench(source)),
+  };
 }
 
 const container = document.getElementById('root');

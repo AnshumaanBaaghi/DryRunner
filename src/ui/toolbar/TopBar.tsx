@@ -28,7 +28,7 @@ function ExamplesMenu() {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button data-testid="examples-trigger" className="max-w-[min(16rem,40vw)]">
+        <Button data-testid="examples-trigger" className="max-w-[min(16rem,32vw)] sm:max-w-[min(16rem,40vw)]">
           <BookOpen size={14} />
           <span className="truncate">{current ? current.title : 'Examples'}</span>
           <ChevronDown size={14} className="text-ink-faint" />

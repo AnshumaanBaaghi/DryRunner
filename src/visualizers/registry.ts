@@ -4,6 +4,8 @@ import { backtrackingVisualizer } from './backtracking';
 import { callStackVisualizer } from './callStack';
 import { dp1dVisualizer } from './dp1d';
 import { dp2dVisualizer } from './dp2d';
+import { graphVisualizer } from './graph';
+import { gridGraphVisualizer } from './gridGraph';
 import { hashMapVisualizer } from './hashMap';
 import { linkedListVisualizer } from './linkedList';
 import { memoVisualizer } from './memo';
@@ -11,9 +13,11 @@ import { queueVisualizer } from './queue';
 import { recursionTreeVisualizer } from './recursionTree';
 import { scalarsVisualizer } from './scalars';
 import { stackVisualizer } from './stack';
+import { treeVisualizer } from './tree';
 import type { AnyVisualizer } from './types';
 
 const PLUGINS: AnyVisualizer[] = [
+  graphVisualizer,
   arrayVisualizer,
   dp1dVisualizer,
   dp2dVisualizer,
@@ -21,6 +25,8 @@ const PLUGINS: AnyVisualizer[] = [
   backtrackingVisualizer,
   memoVisualizer,
   linkedListVisualizer,
+  treeVisualizer,
+  gridGraphVisualizer,
   stackVisualizer,
   queueVisualizer,
   hashMapVisualizer,

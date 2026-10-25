@@ -25,6 +25,12 @@ const CASES: { id: string; viz: string; mode: string; also?: string[] }[] = [
   { id: 'next-greater', viz: 'stack', mode: 'monotonic' },
   { id: 'queue-simulation', viz: 'queue', mode: 'fifo' },
   { id: 'reverse-list', viz: 'linkedList', mode: '' },
+  { id: 'bst-traversals', viz: 'tree', mode: '', also: ['queue'] },
+  { id: 'max-depth', viz: 'tree', mode: '', also: ['callStack'] },
+  { id: 'bfs', viz: 'graph', mode: '', also: ['queue', 'hashMap'] },
+  { id: 'dfs', viz: 'graph', mode: '', also: ['callStack'] },
+  { id: 'dijkstra', viz: 'graph', mode: 'distances', also: ['queue'] },
+  { id: 'islands', viz: 'gridGraph', mode: '', also: ['callStack'] },
 ];
 
 async function gotoStep(page: Page, i: number) {

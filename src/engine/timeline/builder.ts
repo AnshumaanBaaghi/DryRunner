@@ -4,9 +4,9 @@
  */
 import { List, Map as IMap } from 'immutable';
 import type { Loc, ProgramMeta } from '../types/meta';
-import { sameV, type V } from '../types/values';
+import { sameV, UNDEF, type V } from '../types/values';
 import type { LoopRef, StepEvent, TraceEvent } from '../types/trace';
-import { applyMutation, fromSerialized } from './heap';
+import { applyMutation, fromSerialized, orElse } from './heap';
 import type { FrameSnap, HeapObj, LoopSnap, StepDiff, StepRecord, Timeline, VarSlot } from './types';
 
 const emptyDiff = (): StepDiff => ({
@@ -234,7 +234,7 @@ export class TimelineBuilder {
         const params = this.paramBids.get(ev.fnId) ?? [];
         let vars = IMap<number, VarSlot>();
         params.forEach((bid, i) => {
-          if (bid >= 0) vars = vars.set(bid, { v: ev.args[i] ?? { u: 1 }, ord: i });
+          if (bid >= 0) vars = vars.set(bid, { v: orElse(ev.args[i], UNDEF), ord: i });
         });
         const frame: FrameSnap = {
           callId: ev.callId, fnId: ev.fnId, depth: ev.depth, parentId: ev.parentId, lexParentId: ev.lexParentId,
@@ -244,7 +244,7 @@ export class TimelineBuilder {
         this.frameIndex.set(ev.callId, this.frames.size - 1);
         this.diff.pushed.push(ev.callId);
         params.forEach((bid, i) => {
-          if (bid >= 0) this.diff.vars.push({ callId: ev.callId, bid, kind: 'new', value: ev.args[i] ?? { u: 1 } });
+          if (bid >= 0) this.diff.vars.push({ callId: ev.callId, bid, kind: 'new', value: orElse(ev.args[i], UNDEF) });
         });
         tl.calls.set(ev.callId, {
           callId: ev.callId, parentId: ev.parentId, fnId: ev.fnId, args: ev.args, depth: ev.depth, siteSid: ev.siteSid,

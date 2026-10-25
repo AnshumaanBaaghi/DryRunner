@@ -6,7 +6,8 @@ import { IconButton } from '../primitives';
 
 const MODE_TEXT: Record<string, string> = {
   'iteration-space': 'nested loops', window: 'sliding window', 'two-pointers': 'two pointers', 'binary-search': 'binary search',
-  sorting: 'sorting', pointers: 'indexed',
+  sorting: 'sorting', pointers: 'indexed', 'divide-and-conquer': 'divide & conquer', board: 'board', path: 'path', flags: 'flags',
+  monotonic: 'monotonic', fifo: 'FIFO', deque: 'deque', priority: 'priority', distances: 'distances',
 };
 
 export function StageToolbar() {

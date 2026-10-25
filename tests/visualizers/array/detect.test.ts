@@ -75,3 +75,16 @@ for (let i = 0; i < a.length; i++) {
     expect(await arrays('const xs = [1, 2, 3];\nconst total = xs.reduce((s, x) => s + x, 0);\nconsole.log(total);')).toEqual([]);
   });
 });
+
+describe('array detection next to other structures', () => {
+  it('leaves a re-sorted priority queue of numbers to the queue view', async () => {
+    const found = await arrays(`const pq = [5, 3];
+pq.push(4);
+pq.sort((a, b) => b - a);
+const top = pq.pop();
+pq.push(1);
+pq.sort((a, b) => b - a);
+pq.pop();`);
+    expect(found).toEqual([]);
+  });
+});

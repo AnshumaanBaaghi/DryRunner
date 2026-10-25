@@ -96,3 +96,24 @@ const inc = counter(); inc(); inc();`);
     expect(tl.steps[tl.errors[0].step].line).toBe(3);
   });
 });
+
+describe('null values in snapshots', () => {
+  it('keeps null distinct from undefined and holes (properties, elements, Map entries, arguments)', async () => {
+    const tl = await timelineOf(`const o = { p: 1 };
+o.p = null;
+const a = [1, 2];
+a[0] = null;
+const m = new Map();
+m.set(null, null);
+function f(x) {
+  return x;
+}
+f(null);`);
+    const last = lastStep(tl);
+    expect(valueOf(tl, last, 'o')).toEqual({ p: null });
+    expect(valueOf(tl, last, 'a')).toEqual([null, 2]);
+    expect([...(valueOf(tl, last, 'm') as Map<unknown, unknown>)]).toEqual([[null, null]]);
+    const call = tl.steps.findIndex((s) => s.kind === 'call');
+    expect(varsAt(tl, call)).toEqual({ x: 'null' });
+  });
+});

@@ -5,7 +5,7 @@ import { counter, openApp, runCode, selectExample, type Hook } from './helpers';
 const CASES: { id: string; viz: string; mode: string; also?: string[] }[] = [
   { id: 'loop-sum', viz: 'scalars', mode: '' },
   { id: 'nested-pairs', viz: 'scalars', mode: 'iteration-space' },
-  { id: 'longest-substring', viz: 'array', mode: 'window' },
+  { id: 'longest-substring', viz: 'array', mode: 'window', also: ['hashMap'] },
   { id: 'two-sum-sorted', viz: 'array', mode: 'two-pointers' },
   { id: 'binary-search', viz: 'array', mode: 'binary-search' },
   { id: 'bubble-sort', viz: 'array', mode: 'sorting' },
@@ -21,6 +21,10 @@ const CASES: { id: string; viz: string; mode: string; also?: string[] }[] = [
   { id: 'edit-distance', viz: 'dp2d', mode: '' },
   { id: 'knapsack', viz: 'dp2d', mode: '' },
   { id: 'fibonacci-memo', viz: 'memo', mode: '', also: ['callStack'] },
+  { id: 'valid-parentheses', viz: 'stack', mode: '' },
+  { id: 'next-greater', viz: 'stack', mode: 'monotonic' },
+  { id: 'queue-simulation', viz: 'queue', mode: 'fifo' },
+  { id: 'reverse-list', viz: 'linkedList', mode: '' },
 ];
 
 async function gotoStep(page: Page, i: number) {
@@ -56,9 +60,12 @@ test.describe('3D stage', () => {
   test('plugin notes describe how the window moves', async ({ page }) => {
     await openApp(page);
     await selectExample(page, 'longest-substring');
-    const note = page.getByTestId('hud-viz');
-    for (let k = 0; k < 40 && !(await note.isVisible()); k++) await page.keyboard.press('ArrowRight');
-    await expect(note).toContainText(/window (expanded|shrunk): (left|right) → \d+/);
+    // other views add notes too (hash-map lookups), so step until a window note shows up; the notes
+    // element only exists while there are notes, so read the DOM without waiting for it
+    const windowNote = /window (expanded|shrunk): (left|right) → \d+/;
+    const notes = () => page.evaluate(() => document.querySelector('[data-testid="hud-viz"]')?.textContent ?? '');
+    for (let k = 0; k < 60 && !windowNote.test(await notes()); k++) await page.keyboard.press('ArrowRight');
+    await expect(page.getByTestId('hud-viz')).toContainText(windowNote);
   });
 
   test('camera and quality controls', async ({ page }) => {

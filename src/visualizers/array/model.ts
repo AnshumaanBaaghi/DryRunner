@@ -1,6 +1,6 @@
 /** Pure per-step model of the array visualizer (testable without WebGL). */
 import { valueAt } from '../../engine/detect/track';
-import type { Timeline } from '../../engine/timeline/types';
+import type { Snapshot, Timeline } from '../../engine/timeline/types';
 import { previewValue, primitive, refId } from '../../engine/timeline/values';
 import type { V } from '../../engine/types/values';
 import { COLORS } from '../../scene/primitives/materials';
@@ -55,6 +55,18 @@ export const xOf = (index: number, maxLen: number) => (index - (maxLen - 1) / 2)
 
 /** elements ruled out (outside a search interval or the two pointers) */
 export const DIMMED = '#1a212d';
+
+/** Element text that fits a cell: ∞ for infinities, 3 significant digits for long numbers. */
+export function cellText(tl: Timeline, snap: Snapshot, v: V): string {
+  const p = primitive(tl, v);
+  if (typeof p.value !== 'number') return previewValue(tl, snap, v, { depth: 0, maxString: 6 });
+  if (p.value === Infinity) return '∞';
+  if (p.value === -Infinity) return '-∞';
+  const text = String(p.value);
+  if (text.length <= 6) return text;
+  const short = String(Number(p.value.toPrecision(3)));
+  return short.length <= 6 ? short : p.value.toExponential(1);
+}
 
 interface Scale {
   maxAbs: number;
@@ -158,7 +170,7 @@ export function buildArrayModel(tl: Timeline, i: number, b: ArrayBindings, mode:
       key: ids?.[index] !== undefined ? `id${ids[index]}` : `ix${index}`,
       index,
       x: xOf(index, maxLen),
-      label: isHole ? '' : previewValue(tl, snap, e, { depth: 0, maxString: 6 }),
+      label: isHole ? '' : cellText(tl, snap, e),
       num: bars ? num(e) : null,
       color,
       pulse: written.has(index),

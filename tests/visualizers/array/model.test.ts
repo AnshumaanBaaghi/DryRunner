@@ -6,9 +6,9 @@ import type { Timeline } from '../../../src/engine/timeline/types';
 import { exampleById } from '../../../src/examples';
 import { COLORS } from '../../../src/scene/primitives/materials';
 import { detectArrays, type ArrayBindings } from '../../../src/visualizers/array/detect';
-import { buildArrayModel, DIMMED } from '../../../src/visualizers/array/model';
+import { buildArrayModel, cellText, DIMMED } from '../../../src/visualizers/array/model';
 import type { Detection } from '../../../src/visualizers/types';
-import { timelineOf } from '../../helpers/timeline';
+import { lastStep, timelineOf } from '../../helpers/timeline';
 
 async function setup(id: string): Promise<{ tl: Timeline; d: Detection<ArrayBindings> }> {
   const tl = await timelineOf(exampleById(id)!.code);
@@ -91,5 +91,14 @@ describe('array model', () => {
     expect(forward.elems[write.path[0] as number].color).toBe(COLORS.changed);
     const backward = buildArrayModel(tl, i - 1, d.bindings, d.mode, { diff: tl.diffs[i], reversed: true, key: `b${i}` });
     expect(backward.delta?.text).toBe(`${write.value} → ${write.old}`);
+  });
+});
+
+describe('array cell text', () => {
+  it('fits numbers into a cell', async () => {
+    const tl = await timelineOf('const a = [Infinity, -Infinity, 0.1 + 0.2, 1234567, 42, NaN];');
+    const snap = tl.snapshots[lastStep(tl)];
+    const arr = [...snap.heap.values()].find((o) => o.kind === 'array')!;
+    expect(arr.elems!.toArray().map((v) => cellText(tl, snap, v))).toEqual(['∞', '-∞', '0.3', '1.2e+6', '42', 'NaN']);
   });
 });

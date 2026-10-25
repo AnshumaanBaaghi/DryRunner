@@ -1,10 +1,13 @@
 /** Persistent heap objects: built from `alloc` data, updated by `mutate` events (structural sharing). */
 import { List, Map as IMap } from 'immutable';
 import type { MutateEvent } from '../types/trace';
-import type { ObjId, SerializedObj, V } from '../types/values';
+import { UNDEF, type ObjId, type SerializedObj, type V } from '../types/values';
 import type { EntrySlot, HeapObj, PropSlot } from './types';
 
 export const HOLE: V = { hole: 1 };
+
+/** A value the event may omit: `null` is a real value, only a missing one falls back. */
+export const orElse = (v: V | undefined, fallback: V): V => (v === undefined ? fallback : v);
 
 /** Canonical key for Map/Set entries (encoded values compare structurally). */
 export function keyRepr(v: V | undefined): string {
@@ -74,8 +77,8 @@ export function applyMutation(obj: HeapObj, ev: MutateEvent): HeapObj {
   const p0 = ev.path[0];
   switch (ev.op) {
     case 'set':
-      if (elems && typeof p0 === 'number') return { ...obj, elems: setElem(elems, p0, ev.value ?? HOLE) };
-      return setProp(obj, String(p0), ev.value ?? { u: 1 });
+      if (elems && typeof p0 === 'number') return { ...obj, elems: setElem(elems, p0, orElse(ev.value, HOLE)) };
+      return setProp(obj, String(p0), orElse(ev.value, UNDEF));
     case 'delete':
       if (elems && typeof p0 === 'number') return p0 < elems.size ? { ...obj, elems: elems.set(p0, HOLE) } : obj;
       return obj.props ? { ...obj, props: obj.props.delete(String(p0)) } : obj;
@@ -102,9 +105,9 @@ export function applyMutation(obj: HeapObj, ev: MutateEvent): HeapObj {
     case 'copyWithin':
       return ev.after ? { ...obj, elems: List(ev.after) } : obj;
     case 'mapSet':
-      return setEntry(obj, ev.key ?? { u: 1 }, ev.value ?? { u: 1 });
+      return setEntry(obj, orElse(ev.key, UNDEF), orElse(ev.value, UNDEF));
     case 'setAdd':
-      return setEntry(obj, ev.key ?? { u: 1 }, ev.key ?? { u: 1 });
+      return setEntry(obj, orElse(ev.key, UNDEF), orElse(ev.key, UNDEF));
     case 'mapDelete':
     case 'setDelete':
       return obj.entries ? { ...obj, entries: obj.entries.delete(keyRepr(ev.key)) } : obj;

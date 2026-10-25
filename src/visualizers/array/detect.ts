@@ -9,6 +9,7 @@ import { resolveVarKey, type ObjInfo, type TraceAnalysis, type VarInfo } from '.
 import { trackVar, varKey, type VarRef } from '../../engine/detect/track';
 import type { Timeline } from '../../engine/timeline/types';
 import { primitive } from '../../engine/timeline/values';
+import { isPriorityQueue } from '../queue/detect';
 import type { DetectContext, Detection } from '../types';
 
 export type PointerRole = 'pointer' | 'left' | 'right' | 'lo' | 'hi' | 'mid';
@@ -215,6 +216,8 @@ export function detectArrays(ctx: DetectContext): Detection<ArrayBindings>[] {
     if (!strings && objs.length > 3) continue; // a variable re-bound to many arrays (e.g. merge results) is not one array
     const { vars: index, fnIds } = indexVarsFor(key, info.ref.name, ctx);
     const obj = objs[0];
+    // re-sorted between pushes and removals: a priority queue, not an array being sorted
+    if (obj && isPriorityQueue(ctx.tl, obj.id)) continue;
     const writes = obj ? (obj.ops.set ?? 0) + obj.swaps + (obj.ops.sort ?? 0) : 0;
     if (!index.length && (strings || writes === 0)) continue;
     const objKey = obj ? `obj:${obj.id}` : `str:${key}`;

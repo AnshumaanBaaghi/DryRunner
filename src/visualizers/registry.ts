@@ -1,10 +1,16 @@
 /** Every visualizer plugin. Adding one = a folder `src/visualizers/<id>/` exporting a `Visualizer` + one line here. */
 import { arrayVisualizer } from './array';
+import { backtrackingVisualizer } from './backtracking';
+import { callStackVisualizer } from './callStack';
+import { recursionTreeVisualizer } from './recursionTree';
 import { scalarsVisualizer } from './scalars';
 import type { AnyVisualizer } from './types';
 
 const PLUGINS: AnyVisualizer[] = [
   arrayVisualizer,
+  recursionTreeVisualizer,
+  backtrackingVisualizer,
+  callStackVisualizer,
   scalarsVisualizer,
 ];
 

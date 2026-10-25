@@ -6,10 +6,11 @@
 import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { easing } from 'maath';
-import { useEffect, useRef, type ComponentRef } from 'react';
-import { Vector3, type PerspectiveCamera } from 'three';
+import { useEffect, useRef, useState, type ComponentRef } from 'react';
+import { Vector3, type Fog, type PerspectiveCamera } from 'three';
 import { useViz } from '../state/vizStore';
-import { DEFAULT_DIR, fitDistance } from './camera';
+import { visualizerById } from '../visualizers/registry';
+import { DEFAULT_TILT, fitDistance } from './camera';
 import { currentFocus, useFocusStore } from './focus';
 import { useLayoutStore } from './layout';
 
@@ -38,6 +39,7 @@ export function CameraRig() {
   const focus = useFocusStore((s) => currentFocus(s.points));
   const follow = useViz((s) => s.follow);
   const active = useViz((s) => s.active);
+  const tilt = useViz((s) => visualizerById(s.active.find((d) => d.role === 'primary')?.vizId ?? '')?.cameraTilt ?? DEFAULT_TILT);
   const viewNonce = useViz((s) => s.viewNonce);
   const hudInset = useViz((s) => s.hudInset);
   const goal = useRef<Goal | null>(null);
@@ -47,16 +49,24 @@ export function CameraRig() {
   const framed = useRef(false);
   /** "reset view" also restores the default viewing angle */
   const resetAngle = useRef(true);
+  /** bumps when a fitting window closes, so follow mode can take over without waiting for a step */
+  const [fitDone, setFitDone] = useState(0);
 
-  // a new set of visualizers: frame them (sizes arrive over the next frames, so keep re-fitting briefly)
+  // a new set of visualizers: frame them from their preferred angle (sizes arrive over the next frames,
+  // so keep re-fitting briefly)
   useEffect(() => {
     fitUntil.current = performance.now() + 1200;
+    resetAngle.current = true;
+    const t = setTimeout(() => setFitDone((n) => n + 1), 1250);
+    return () => clearTimeout(t);
   }, [active]);
 
   useEffect(() => {
     pausedUntil.current = 0;
     fitUntil.current = performance.now() + 600;
     resetAngle.current = true;
+    const t = setTimeout(() => setFitDone((n) => n + 1), 650);
+    return () => clearTimeout(t);
   }, [viewNonce]);
 
   useEffect(() => {
@@ -78,22 +88,22 @@ export function CameraRig() {
     const comfort = Math.max(12, READABLE * height);
     let target = center;
     let dist = fit;
-    if (!fitting && fit > comfort * 1.15 && focus) {
+    // zoom in only for really large scenes; a composition of a few panels is better seen whole
+    if (!fitting && fit > comfort * 2.2 && focus) {
       target = new Vector3(...focus).clamp(min, max);
-      target.y = Math.max(target.y, center.y * 0.6);
       dist = comfort;
     }
     const viewHeight = 2 * dist * Math.tan((camera.fov * Math.PI) / 360);
     target = target.clone();
     target.y -= ((bottom + 1 - top) / 2 - 0.5) * viewHeight;
     const dir = resetAngle.current
-      ? new Vector3(...DEFAULT_DIR).normalize()
+      ? new Vector3(0, tilt, 1).normalize()
       : camera.position.clone().sub(c.target).normalize();
     goal.current = { target, dist, dir, snap: !framed.current };
     framed.current = true;
     resetAngle.current = false;
     invalidate();
-  }, [bounds, complete, focus, follow, viewNonce, hudInset, width, height, camera, invalidate]);
+  }, [bounds, complete, focus, follow, viewNonce, hudInset, tilt, fitDone, width, height, camera, invalidate]);
 
   useEffect(() => {
     const c = controls.current;
@@ -114,22 +124,37 @@ export function CameraRig() {
     };
   }, []);
 
-  useFrame((_, delta) => {
-    const g = goal.current;
+  useFrame((state, delta) => {
     const c = controls.current;
-    if (!g || !c) return;
-    const pos = g.target.clone().addScaledVector(g.dir, g.dist);
-    if (g.snap) {
-      c.target.copy(g.target);
-      camera.position.copy(pos);
-    } else {
-      const dt = Math.min(delta, 0.1);
-      easing.damp3(c.target, g.target, SMOOTH, dt);
-      easing.damp3(camera.position, pos, SMOOTH, dt);
+    if (!c) return;
+    const cam = state.camera as PerspectiveCamera;
+    const g = goal.current;
+    if (g) {
+      const pos = g.target.clone().addScaledVector(g.dir, g.dist);
+      if (g.snap) {
+        c.target.copy(g.target);
+        cam.position.copy(pos);
+      } else {
+        const dt = Math.min(delta, 0.1);
+        easing.damp3(c.target, g.target, SMOOTH, dt);
+        easing.damp3(cam.position, pos, SMOOTH, dt);
+      }
+      c.update();
+      if (c.target.distanceTo(g.target) < 0.002 && cam.position.distanceTo(pos) < 0.002) goal.current = null;
+      else state.invalidate();
     }
-    c.update();
-    if (c.target.distanceTo(g.target) < 0.002 && camera.position.distanceTo(pos) < 0.002) goal.current = null;
-    else invalidate();
+    // fog and the far plane follow the viewing distance: big scenes are neither fogged out nor clipped
+    const dist = cam.position.distanceTo(c.target);
+    const fog = state.scene.fog as Fog | null;
+    if (fog) {
+      fog.near = dist * 1.8;
+      fog.far = dist * 5;
+    }
+    const far = Math.max(300, dist * 6);
+    if (Math.abs(cam.far - far) > 1) {
+      cam.far = far;
+      cam.updateProjectionMatrix();
+    }
   });
 
   return (
@@ -141,7 +166,7 @@ export function CameraRig() {
       rotateSpeed={0.7}
       zoomSpeed={0.85}
       minDistance={2.5}
-      maxDistance={120}
+      maxDistance={3000}
       maxPolarAngle={Math.PI * 0.495}
     />
   );

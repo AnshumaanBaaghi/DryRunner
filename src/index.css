@@ -51,6 +51,11 @@ body,
   -webkit-font-smoothing: antialiased;
 }
 
+/* code shows operators as typed: `===` must not merge into a ligature */
+.font-mono {
+  font-variant-ligatures: none;
+}
+
 /* change flash for values in panels and the trace table */
 @keyframes as-flash {
   0% { background-color: color-mix(in srgb, var(--color-hl-changed) 45%, transparent); }

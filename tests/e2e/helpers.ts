@@ -73,9 +73,12 @@ export async function highlightedLine(page: Page): Promise<number | null> {
   });
 }
 
-/** Polls until the editor highlight settles on `expected` (Monaco paints decorations on the next frame). */
+/**
+ * Polls until the editor highlight settles on `expected` (Monaco paints decorations on its next frame;
+ * with software-rendered WebGL on a loaded machine that frame can be seconds away).
+ */
 export async function expectLine(page: Page, expected: number | null, message?: string) {
-  await expect.poll(() => highlightedLine(page), { message, timeout: 3000 }).toBe(expected);
+  await expect.poll(() => highlightedLine(page), { message, timeout: 10_000 }).toBe(expected);
 }
 
 export async function hudChain(page: Page): Promise<string> {

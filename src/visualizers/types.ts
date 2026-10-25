@@ -49,6 +49,8 @@ export interface Visualizer<B = unknown> {
   Component: VizComponent<B>;
   /** extra HUD lines for the current step (e.g. "window expanded: right → 5") */
   describe?(tl: Timeline, i: number, detection: Detection<B>): string[];
+  /** default camera elevation when this is the primary view: 0 = level (upright trees, boards), 0.42 = looking down (bars) */
+  cameraTilt?: number;
 }
 
 /** Erased plugin type for the registry (bindings are plugin-private, so the variance is irrelevant there). */

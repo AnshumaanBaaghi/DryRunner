@@ -1,15 +1,21 @@
 import { expect, test, type Page } from '@playwright/test';
 import { counter, openApp, runCode, selectExample, type Hook } from './helpers';
 
-/** Phase 2 visualizers: what each example must show without any override. */
-const CASES = [
+/** What each example must show without any override (primary view first, then the others). */
+const CASES: { id: string; viz: string; mode: string; also?: string[] }[] = [
   { id: 'loop-sum', viz: 'scalars', mode: '' },
   { id: 'nested-pairs', viz: 'scalars', mode: 'iteration-space' },
   { id: 'longest-substring', viz: 'array', mode: 'window' },
   { id: 'two-sum-sorted', viz: 'array', mode: 'two-pointers' },
   { id: 'binary-search', viz: 'array', mode: 'binary-search' },
   { id: 'bubble-sort', viz: 'array', mode: 'sorting' },
-  { id: 'quick-sort', viz: 'array', mode: 'sorting' },
+  { id: 'quick-sort', viz: 'array', mode: 'sorting', also: ['recursionTree', 'callStack'] },
+  { id: 'fibonacci', viz: 'recursionTree', mode: '', also: ['callStack'] },
+  { id: 'factorial', viz: 'recursionTree', mode: '', also: ['callStack'] },
+  { id: 'merge-sort', viz: 'recursionTree', mode: 'divide-and-conquer', also: ['callStack'] },
+  { id: 'n-queens', viz: 'backtracking', mode: 'board' },
+  { id: 'subsets', viz: 'backtracking', mode: 'path' },
+  { id: 'permutations', viz: 'backtracking', mode: 'path' },
 ];
 
 async function gotoStep(page: Page, i: number) {
@@ -25,6 +31,7 @@ test.describe('3D stage', () => {
       if (c.id !== 'loop-sum') await selectExample(page, c.id);
       await expect(primaryChip(page)).toHaveAttribute('data-viz', c.viz);
       await expect(primaryChip(page)).toHaveAttribute('data-mode', c.mode);
+      for (const other of c.also ?? []) await expect(page.getByTestId('stage-viz').locator(`[data-viz="${other}"]`)).toHaveCount(1);
       await expect(page.getByTestId('stage-canvas').locator('canvas')).toBeVisible();
 
       for (let k = 0; k < 4; k++) await page.keyboard.press('ArrowRight');

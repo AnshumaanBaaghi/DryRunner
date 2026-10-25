@@ -1,9 +1,11 @@
 /**
  * Per-step value of a variable (by declaring function + binding ids): the topmost frame of that function
  * that holds the binding wins (recursion shows the current call's value); once a value was seen it is
- * carried forward after the frame returns, so a structure stays visible after its function ends.
+ * carried forward after the frame returns, so a structure stays visible after its function ends. When a
+ * function declares the name more than once (consecutive `for (let i …)` loops) the binding in scope wins.
  */
-import type { FrameSnap, Timeline } from '../timeline/types';
+import { isVisible } from '../timeline/scope';
+import type { FrameSnap, Timeline, VarSlot } from '../timeline/types';
 import type { V } from '../types/values';
 
 export interface VarRef {
@@ -16,12 +18,18 @@ export const varKey = (ref: Pick<VarRef, 'name' | 'fnId'>) => `${ref.fnId}:${ref
 
 const cache = new WeakMap<Timeline, Map<string, { length: number; values: (V | undefined)[] }>>();
 
-function frameValue(frame: FrameSnap, bids: number[]): V | undefined {
+/** The binding in scope (latest declared among them), else the latest declared one the frame holds. */
+function frameValue(tl: Timeline, frame: FrameSnap, bids: number[]): V | undefined {
+  if (bids.length === 1) return frame.vars.get(bids[0])?.v;
+  let held: VarSlot | undefined;
+  let visible: VarSlot | undefined;
   for (const bid of bids) {
     const slot = frame.vars.get(bid);
-    if (slot) return slot.v;
+    if (!slot) continue;
+    if (!held || slot.ord > held.ord) held = slot;
+    if ((!visible || slot.ord > visible.ord) && isVisible(tl, frame, bid, slot)) visible = slot;
   }
-  return undefined;
+  return (visible ?? held)?.v;
 }
 
 export function trackVar(tl: Timeline, ref: VarRef): (V | undefined)[] {
@@ -42,14 +50,14 @@ export function trackVar(tl: Timeline, ref: VarRef): (V | undefined)[] {
     for (let k = frames.size - 1; k >= 0; k--) {
       const f = frames.get(k) as FrameSnap;
       if (f.fnId !== ref.fnId) continue;
-      found = frameValue(f, ref.bids);
+      found = frameValue(tl, f, ref.bids);
       if (found !== undefined) break;
     }
     if (found === undefined && ref.fnId !== 0) {
       // closure frames (exited) still hold the binding
       for (const f of tl.snapshots[i].detached.values()) {
         if (f.fnId === ref.fnId) {
-          found = frameValue(f, ref.bids);
+          found = frameValue(tl, f, ref.bids);
           if (found !== undefined) break;
         }
       }

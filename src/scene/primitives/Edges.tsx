@@ -1,6 +1,7 @@
 /**
  * Many straight edges in one draw call: screen-space-width lines (LineSegments2) with a color per edge.
- * The buffers are rebuilt only when the edge list changes, and a shorter list never leaves stale lines.
+ * Every change of the edge list gets a fresh geometry: three caches an instanced geometry's instance
+ * count on first draw, so refilling the old one would keep drawing only as many edges as it first had.
  */
 import { useThree } from '@react-three/fiber';
 import { useEffect, useLayoutEffect, useMemo } from 'react';
@@ -17,7 +18,7 @@ export interface EdgeSpec {
 
 const scratch = new Color();
 
-function writeEdges(geometry: LineSegmentsGeometry, edges: EdgeSpec[]): void {
+function writeEdges(line: LineSegments2, edges: EdgeSpec[]): void {
   // an empty list still needs one (invisible) segment: the geometry can't be zero-sized
   const n = Math.max(1, edges.length);
   const pos = new Float32Array(n * 6);
@@ -27,8 +28,12 @@ function writeEdges(geometry: LineSegmentsGeometry, edges: EdgeSpec[]): void {
     scratch.set(e.color);
     col.set([scratch.r, scratch.g, scratch.b, scratch.r, scratch.g, scratch.b], k * 6);
   });
+  const geometry = new LineSegmentsGeometry();
   geometry.setPositions(pos);
   geometry.setColors(col);
+  const old = line.geometry;
+  line.geometry = geometry;
+  old.dispose();
 }
 
 function styleMaterial(material: LineMaterial, width: number, w: number, h: number): void {
@@ -41,17 +46,16 @@ export function Edges({ edges, width = 2 }: { edges: EdgeSpec[]; width?: number 
   const h = useThree((s) => s.size.height);
   const invalidate = useThree((s) => s.invalidate);
   const parts = useMemo(() => {
-    const geometry = new LineSegmentsGeometry();
     const material = new LineMaterial({ vertexColors: true, linewidth: 2 });
-    return { geometry, material, line: new LineSegments2(geometry, material) };
+    return { material, line: new LineSegments2(new LineSegmentsGeometry(), material) };
   }, []);
   useLayoutEffect(() => {
-    writeEdges(parts.geometry, edges);
+    writeEdges(parts.line, edges);
     invalidate();
   }, [parts, edges, invalidate]);
   useLayoutEffect(() => styleMaterial(parts.material, width, w, h), [parts, width, w, h]);
   useEffect(() => () => {
-    parts.geometry.dispose();
+    parts.line.geometry.dispose();
     parts.material.dispose();
   }, [parts]);
   return <primitive object={parts.line} />;

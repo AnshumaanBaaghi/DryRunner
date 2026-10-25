@@ -17,22 +17,27 @@ export interface VisibilityOptions {
   includeFunctions?: boolean;
 }
 
+/** Whether a binding the frame holds is in scope at the frame's current statement. */
+export function isVisible(tl: Timeline, frame: FrameSnap, bid: number, slot: VarSlot): boolean {
+  const b = tl.meta.bindings[bid];
+  if (!b) return false;
+  if (b.loopId !== undefined) {
+    const loop = frame.loops.findLast((l) => l.loopId === b.loopId);
+    if (!loop || loop.inst !== slot.loopInst) return false;
+    return b.loopScope !== 'body' || loop.iteration === slot.iter;
+  }
+  if (b.kind !== 'let' && b.kind !== 'const') return true;
+  const pos = frame.stmt >= 0 ? (tl.meta.stmts[frame.stmt]?.loc.start ?? -1) : -1;
+  return pos < 0 || (pos >= b.scopeStart && pos <= b.scopeEnd);
+}
+
 export function visibleVars(tl: Timeline, frame: FrameSnap, opts: VisibilityOptions = {}): VisibleVar[] {
-  const meta = tl.meta;
-  const pos = frame.stmt >= 0 ? (meta.stmts[frame.stmt]?.loc.start ?? -1) : -1;
   const out: VisibleVar[] = [];
   for (const [bid, slot] of frame.vars) {
-    const b = meta.bindings[bid];
+    const b = tl.meta.bindings[bid];
     if (!b) continue;
     if (!opts.includeFunctions && (b.kind === 'function' || b.kind === 'class' || isFnValue(slot.v))) continue;
-    if (b.loopId !== undefined) {
-      const loop = frame.loops.findLast((l) => l.loopId === b.loopId);
-      if (!loop || loop.inst !== slot.loopInst) continue;
-      if (b.loopScope === 'body' && loop.iteration !== slot.iter) continue;
-    } else if ((b.kind === 'let' || b.kind === 'const') && pos >= 0 && (pos < b.scopeStart || pos > b.scopeEnd)) {
-      continue;
-    }
-    out.push({ bid, name: b.name, kind: b.kind, slot });
+    if (isVisible(tl, frame, bid, slot)) out.push({ bid, name: b.name, kind: b.kind, slot });
   }
   return out.sort((a, b) => a.slot.ord - b.slot.ord);
 }

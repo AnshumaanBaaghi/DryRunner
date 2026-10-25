@@ -16,6 +16,11 @@ const CASES: { id: string; viz: string; mode: string; also?: string[] }[] = [
   { id: 'n-queens', viz: 'backtracking', mode: 'board' },
   { id: 'subsets', viz: 'backtracking', mode: 'path' },
   { id: 'permutations', viz: 'backtracking', mode: 'path' },
+  { id: 'climbing-stairs', viz: 'dp1d', mode: '' },
+  { id: 'lcs', viz: 'dp2d', mode: '' },
+  { id: 'edit-distance', viz: 'dp2d', mode: '' },
+  { id: 'knapsack', viz: 'dp2d', mode: '' },
+  { id: 'fibonacci-memo', viz: 'memo', mode: '', also: ['callStack'] },
 ];
 
 async function gotoStep(page: Page, i: number) {

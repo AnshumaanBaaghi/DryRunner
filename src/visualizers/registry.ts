@@ -2,14 +2,20 @@
 import { arrayVisualizer } from './array';
 import { backtrackingVisualizer } from './backtracking';
 import { callStackVisualizer } from './callStack';
+import { dp1dVisualizer } from './dp1d';
+import { dp2dVisualizer } from './dp2d';
+import { memoVisualizer } from './memo';
 import { recursionTreeVisualizer } from './recursionTree';
 import { scalarsVisualizer } from './scalars';
 import type { AnyVisualizer } from './types';
 
 const PLUGINS: AnyVisualizer[] = [
   arrayVisualizer,
+  dp1dVisualizer,
+  dp2dVisualizer,
   recursionTreeVisualizer,
   backtrackingVisualizer,
+  memoVisualizer,
   callStackVisualizer,
   scalarsVisualizer,
 ];

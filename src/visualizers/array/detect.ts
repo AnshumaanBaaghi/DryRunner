@@ -20,7 +20,8 @@ export interface ArrayBindings {
   /** heap object (absent for strings) */
   objId?: number;
   isString: boolean;
-  pointers: { ref: VarRef; role: PointerRole }[];
+  /** `offset`: the shift between the variable and the index it actually uses (`weights[i - 1]` → -1) */
+  pointers: { ref: VarRef; role: PointerRole; offset?: number }[];
   window?: { left: VarRef; right: VarRef };
   interval?: { lo: VarRef; hi: VarRef; mid?: VarRef };
   /** two pointers: elements outside [left, right] are already ruled out */
@@ -226,24 +227,62 @@ export function detectArrays(ctx: DetectContext): Detection<ArrayBindings>[] {
       byObject.set(objKey, { key, info, obj, index: prev && prev.index.length > index.length ? prev.index : index, fnIds });
     }
   }
-  const out: Detection<ArrayBindings>[] = [];
-  for (const [objKey, { info, obj, index, fnIds }] of byObject) {
-    const writes = obj ? WRITE_OPS.reduce((n, op) => n + (obj.ops[op] ?? 0), 0) : 0;
-    const bounds = boundVars(ctx, fnIds, maxLength(ctx.tl, info, obj), index);
-    const m = chooseMode(ctx, obj, index, bounds, writes);
-    const claims = [objKey, varKey(info.ref), ...(obj ? [...obj.varKeys] : [])];
-    out.push({
-      vizId: 'array',
-      key: `array:${objKey}`,
-      title: info.ref.name,
-      score: m.score,
-      role: 'primary',
-      mode: m.mode,
-      claims: [...new Set(claims)],
-      bindings: {
-        target: info.ref, objId: obj?.id, isString: !obj, pointers: m.pointers, window: m.window, interval: m.interval, span: m.span,
-      },
+  return [...byObject].map(([objKey, { info, obj, index, fnIds }]) => arrayDetection(ctx, `array:${objKey}`, info, obj, index, fnIds));
+}
+
+/** How far the index a pointer reads / writes usually sits from its value (0 unless one small shift dominates). */
+function pointerOffset(tl: Timeline, ref: VarRef, objId: number): number {
+  const values = trackVar(tl, ref);
+  const counts = new Map<number, number>();
+  let total = 0;
+  const note = (index: unknown, value: unknown) => {
+    if (typeof index !== 'number' || typeof value !== 'number') return;
+    counts.set(index - value, (counts.get(index - value) ?? 0) + 1);
+    total += 1;
+  };
+  for (let s = 0; s < tl.diffs.length; s++) {
+    const d = tl.diffs[s];
+    for (const r of d.reads) if (r.id === objId) note(r.path[0], values[s]);
+    for (const h of d.heap) if (h.id === objId && h.op === 'set') note(h.path[0], values[s]);
+  }
+  let best = 0;
+  let bestN = 0;
+  for (const [offset, n] of counts) if (n > bestN) [best, bestN] = [offset, n];
+  return total >= 2 && bestN / total >= 0.6 && Math.abs(best) <= 2 ? best : 0;
+}
+
+function arrayDetection(ctx: DetectContext, key: string, info: VarInfo, obj: ObjInfo | undefined, index: VarInfo[], fnIds: Set<number>): Detection<ArrayBindings> {
+  const writes = obj ? WRITE_OPS.reduce((n, op) => n + (obj.ops[op] ?? 0), 0) : 0;
+  const bounds = boundVars(ctx, fnIds, maxLength(ctx.tl, info, obj), index);
+  const m = chooseMode(ctx, obj, index, bounds, writes);
+  // plain pointers follow the cell they actually use; window / search bounds keep their values
+  if (obj && (m.mode === 'pointers' || m.mode === 'sorting')) {
+    m.pointers = m.pointers.map((p) => {
+      const offset = pointerOffset(ctx.tl, p.ref, obj.id);
+      return offset ? { ...p, offset } : p;
     });
   }
-  return out;
+  const claims = [obj ? `obj:${obj.id}` : `str:${varKey(info.ref)}`, varKey(info.ref), ...(obj ? [...obj.varKeys] : [])];
+  return {
+    vizId: 'array',
+    key,
+    title: info.ref.name,
+    score: m.score,
+    role: 'primary',
+    mode: m.mode,
+    claims: [...new Set(claims)],
+    bindings: {
+      target: info.ref, objId: obj?.id, isString: !obj, pointers: m.pointers, window: m.window, interval: m.interval, span: m.span,
+    },
+  };
+}
+
+/** A variable shown as an array on request (any array or string it holds), with the usual modes and pointers. */
+export function bindArray(ctx: DetectContext, ref: VarRef): Detection<ArrayBindings> | null {
+  const info = ctx.analysis.vars.get(varKey(ref));
+  if (!info) return null;
+  const obj = [...info.heapIds].map((id) => ctx.analysis.objects.get(id)).find((o) => o?.kind === 'array' || o?.kind === 'typed');
+  if (!obj && !info.kinds.has('string')) return null;
+  const { vars: index, fnIds } = indexVarsFor(varKey(ref), ref.name, ctx);
+  return { ...arrayDetection(ctx, `bound:array:${varKey(ref)}`, info, obj, index, fnIds), score: 1 };
 }

@@ -26,6 +26,8 @@ export type Vec3 = [number, number, number];
 
 export const GAP = 2.2;
 const DEFAULT_SIZE: SlotSize = { w: 4, h: 3, d: 1 };
+/** a row of views wider than this many times its height wraps its secondaries above the primary */
+export const MAX_ROW_ASPECT = 2.4;
 
 /** Pure placement: returns slot centers (x, bottom y, z) and the overall bounds. */
 export function computeLayout(specs: SlotSpec[], sizes: Record<string, SlotSize>): {
@@ -40,16 +42,30 @@ export function computeLayout(specs: SlotSpec[], sizes: Record<string, SlotSize>
   const aux = sorted.filter((s) => s !== primary && s.role === 'aux');
   let right = 0;
   let left = 0;
+  const p = primary ? size(primary.id) : { w: 0, h: 0, d: 0 };
   if (primary) {
-    const p = size(primary.id);
     positions[primary.id] = [0, 0, 0];
     right = p.w / 2;
     left = -p.w / 2;
   }
-  for (const s of secondaries) {
-    const sz = size(s.id);
-    positions[s.id] = [right + GAP + sz.w / 2, 0, 0];
-    right += GAP + sz.w;
+  const rowW = secondaries.reduce((w, s) => w + GAP + size(s.id).w, 0);
+  const rowH = Math.max(p.h, ...secondaries.map((s) => size(s.id).h));
+  if (secondaries.length && (p.w + rowW) / Math.max(1, rowH) > MAX_ROW_ASPECT) {
+    // too wide for the stage: the secondaries form a row above the primary
+    let x = -(rowW - GAP) / 2;
+    for (const s of secondaries) {
+      const sz = size(s.id);
+      positions[s.id] = [x + sz.w / 2, p.h + GAP * 0.8, 0];
+      x += sz.w + GAP;
+    }
+    right = Math.max(right, (rowW - GAP) / 2);
+    left = -right;
+  } else {
+    for (const s of secondaries) {
+      const sz = size(s.id);
+      positions[s.id] = [right + GAP + sz.w / 2, 0, 0];
+      right += GAP + sz.w;
+    }
   }
   const columns: Record<SlotSide, SlotSpec[]> = { left: [], right: [] };
   for (const s of aux) columns[s.side ?? 'left'].push(s);

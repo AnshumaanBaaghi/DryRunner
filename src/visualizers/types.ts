@@ -51,6 +51,11 @@ export interface Visualizer<B = unknown> {
   describe?(tl: Timeline, i: number, detection: Detection<B>): string[];
   /** default camera elevation when this is the primary view: 0 = level (upright trees, boards), 0.42 = looking down (bars) */
   cameraTilt?: number;
+  /**
+   * "Show this variable with this view" (role mapping): a detection bound to `ref`, or null when the
+   * variable never holds anything this view can draw.
+   */
+  bindTo?(ctx: DetectContext, ref: VarRef): Detection<B> | null;
 }
 
 /** Erased plugin type for the registry (bindings are plugin-private, so the variance is irrelevant there). */

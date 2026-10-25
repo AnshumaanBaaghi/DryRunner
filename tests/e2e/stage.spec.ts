@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { counter, openApp, runCode, selectExample, type Hook } from './helpers';
+import { counter, openApp, runCode, selectExample, waitDone, type Hook } from './helpers';
 
 /** What each example must show without any override (primary view first, then the others). */
 const CASES: { id: string; viz: string; mode: string; also?: string[] }[] = [
@@ -72,6 +72,31 @@ test.describe('3D stage', () => {
     const notes = () => page.evaluate(() => document.querySelector('[data-testid="hud-viz"]')?.textContent ?? '');
     for (let k = 0; k < 60 && !windowNote.test(await notes()); k++) await page.keyboard.press('ArrowRight');
     await expect(page.getByTestId('hud-viz')).toContainText(windowNote);
+  });
+
+  test('the view menu picks the main view, binds a variable and returns to automatic', async ({ page }) => {
+    const { errors } = await openApp(page);
+    await selectExample(page, 'quick-sort');
+    const trigger = page.getByTestId('view-trigger');
+    await expect(trigger).toHaveText(/View: auto/);
+    await trigger.click();
+    await page.getByTestId('view-primary-recursionTree').click();
+    await expect(primaryChip(page)).toHaveAttribute('data-viz', 'recursionTree');
+    await expect(trigger).toHaveText(/View: custom/);
+    await trigger.click();
+    await page.getByTestId('view-bind').hover();
+    await page.getByTestId('view-bind-arr').hover();
+    await page.getByTestId('view-bind-arr-stack').click();
+    await expect(primaryChip(page)).toHaveAttribute('data-viz', 'stack');
+    // re-running the same code keeps the choice
+    await page.getByTestId('visualize').click();
+    await waitDone(page);
+    await expect(primaryChip(page)).toHaveAttribute('data-viz', 'stack');
+    await trigger.click();
+    await page.getByTestId('view-auto').click();
+    await expect(primaryChip(page)).toHaveAttribute('data-viz', 'array');
+    await expect(trigger).toHaveText(/View: auto/);
+    expect(errors).toEqual([]);
   });
 
   test('camera and quality controls', async ({ page }) => {

@@ -88,3 +88,17 @@ pq.pop();`);
     expect(found).toEqual([]);
   });
 });
+
+describe('pointer offsets', () => {
+  it('puts a pointer on the cell it indexes when one shift dominates (weights[i - 1])', async () => {
+    const tl = await timelineOf(exampleById('knapsack')!.code);
+    const found = detectArrays({ tl, analysis: analyzeTrace(tl) });
+    const weights = found.find((d) => d.title === 'weights')!;
+    expect(weights.bindings.pointers.map((p) => `${p.ref.name}${p.offset ?? 0}`)).toEqual(['i-1']);
+  });
+
+  it('keeps offset 0 when the pointer reads around itself (arr[j] and arr[j + 1])', async () => {
+    const [d] = await arrays(example('bubble-sort'));
+    expect(d.bindings.pointers.every((p) => !p.offset)).toBe(true);
+  });
+});

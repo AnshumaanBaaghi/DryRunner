@@ -15,6 +15,7 @@ import { DeltaLabel } from '../../scene/primitives/DeltaLabel';
 import { Label } from '../../scene/primitives/Label';
 import { COLORS } from '../../scene/primitives/materials';
 import { usePulse } from '../../scene/primitives/pulse';
+import { useViz } from '../../state/vizStore';
 import type { VizProps } from '../types';
 import { iterationSpace } from './iterations';
 import { LoopRing } from './LoopRing';
@@ -54,6 +55,7 @@ function CardView({ card, x, y, stepKey }: { card: Card; x: number; y: number; s
 
 export function ScalarsView({ view, detection }: VizProps<Record<string, never>>) {
   const hl = useHighlight(view);
+  const hiddenVars = useViz((s) => s.hiddenVars);
   const { tl, snap, step } = view;
   const stepKey = hl?.key ?? String(view.i);
   const cards = useMemo(() => {
@@ -63,7 +65,7 @@ export function ScalarsView({ view, detection }: VizProps<Record<string, never>>
     for (const f of frames) {
       for (const v of visibleVars(tl, f)) {
         if (isObj(v.slot.v) && 'r' in v.slot.v) continue;
-        if (out.some((c) => c.name === v.name)) continue;
+        if (hiddenVars.includes(v.name) || out.some((c) => c.name === v.name)) continue;
         const change = hl?.diff.vars.findLast((c) => c.bid === v.bid && c.callId === f.callId);
         const fmt = (x: V | undefined) => previewValue(tl, snap, x, { depth: 0, maxString: 14 });
         let delta: string | undefined;
@@ -75,7 +77,7 @@ export function ScalarsView({ view, detection }: VizProps<Record<string, never>>
       }
     }
     return out;
-  }, [tl, snap, step, hl]);
+  }, [tl, snap, step, hl, hiddenVars]);
 
   const loops = step.loops;
   const outer = loops.length >= 2 ? loops[loops.length - 2] : null;

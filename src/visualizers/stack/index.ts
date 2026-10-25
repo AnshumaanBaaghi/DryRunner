@@ -3,7 +3,8 @@ import { lazy } from 'react';
 import type { Timeline } from '../../engine/timeline/types';
 import { previewValue } from '../../engine/timeline/values';
 import type { V } from '../../engine/types/values';
-import type { Detection, Visualizer } from '../types';
+import { boundClaims, boundKey, heldObjects } from '../bind';
+import type { DetectContext, Detection, VarRef, Visualizer } from '../types';
 import { detectStacks, type StackBindings } from './detect';
 import { stackObjAt } from './model';
 import { evictionAt, fmtRank, indexedAt, isRank, rankOf } from './monotonic';
@@ -53,4 +54,12 @@ export const stackVisualizer: Visualizer<StackBindings> = {
   Component: StackView,
   describe,
   cameraTilt: 0.3,
+  bindTo(ctx: DetectContext, ref: VarRef): Detection<StackBindings> | null {
+    const objs = heldObjects(ctx, ref, ['array']);
+    if (!objs.length) return null;
+    return {
+      vizId: 'stack', key: boundKey('stack', ref), title: ref.name, score: 1, role: 'primary',
+      claims: boundClaims(ref, objs), bindings: { target: ref, objId: objs[0].id },
+    };
+  },
 };

@@ -2,7 +2,7 @@ import { lazy } from 'react';
 import { valueAt } from '../../engine/detect/track';
 import type { Timeline } from '../../engine/timeline/types';
 import type { Detection, Visualizer } from '../types';
-import { detectArrays, type ArrayBindings } from './detect';
+import { bindArray, detectArrays, type ArrayBindings } from './detect';
 
 const ArrayView = lazy(() => import('./ArrayView').then((m) => ({ default: m.ArrayView })));
 
@@ -39,4 +39,5 @@ export const arrayVisualizer: Visualizer<ArrayBindings> = {
   detect: detectArrays,
   Component: ArrayView,
   describe,
+  bindTo: bindArray,
 };

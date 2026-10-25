@@ -180,7 +180,8 @@ export function buildArrayModel(tl: Timeline, i: number, b: ArrayBindings, mode:
   const pointers: PointerModel[] = [];
   const perIndex = new Map<number, number>();
   for (const p of b.pointers) {
-    const index = ptrValue(p.ref);
+    const value = ptrValue(p.ref);
+    const index = value === null ? null : value + (p.offset ?? 0);
     if (index === null || index < -1 || index > maxLen) continue;
     const stack = perIndex.get(index) ?? 0;
     perIndex.set(index, stack + 1);

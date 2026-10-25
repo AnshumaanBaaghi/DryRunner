@@ -6,6 +6,7 @@ import { useEditor } from '../../state/editorStore';
 import { useRun } from '../../state/runStore';
 import { useUi } from '../../state/uiStore';
 import { Button, IconButton, Kbd } from '../primitives';
+import { ViewMenu } from './ViewMenu';
 
 const SHORTCUTS: [string, string][] = [
   ['Space', 'Play / pause'],
@@ -88,6 +89,7 @@ export function TopBar() {
       {status === 'running' && (
         <IconButton label="Stop" onClick={cancel}><Square size={14} /></IconButton>
       )}
+      <ViewMenu />
       {stale && <span className="hidden text-xs text-hl-changed lg:inline" data-testid="stale">Code changed — re-run to update the trace</span>}
       <div className="ml-auto flex shrink-0 items-center gap-1">
         <Popover.Root>

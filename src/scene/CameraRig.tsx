@@ -1,13 +1,15 @@
 /**
- * Orbit camera with damping. A new scene and "reset view" frame every visualizer below the HUD; with
- * follow on, the camera re-frames as the layout changes and — when the whole scene would make labels
- * unreadably small — glides to the step's focus point. Any manual orbit/zoom pauses following for 4 s.
+ * Orbit camera with damping. One finger moves the view and two fingers rotate it, on touch screens as on
+ * trackpads (a one-finger click-drag is the left button, a two-finger one the right); pinch / scroll zooms.
+ * A new scene and "reset view" frame every visualizer below the HUD; with follow on, the camera re-frames
+ * as the layout changes and — when the whole scene would make labels unreadably small — glides to the
+ * step's focus point. Any manual orbit/zoom pauses following for 4 s.
  */
 import { OrbitControls } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import { easing } from 'maath';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Vector3, type Fog, type PerspectiveCamera } from 'three';
+import { MOUSE, TOUCH, Vector3, type Fog, type PerspectiveCamera } from 'three';
 import { useViz } from '../state/vizStore';
 import { visualizerById } from '../visualizers/registry';
 import { DEFAULT_TILT, fitDistance } from './camera';
@@ -20,6 +22,8 @@ const PAUSE_MS = 4000;
 /** world-units-per-pixel budget: beyond this distance 0.26-unit labels drop under ~9 px, so follow zooms in */
 const READABLE = 0.04;
 const SMOOTH = 0.35;
+const MOUSE_BUTTONS = { LEFT: MOUSE.PAN, MIDDLE: MOUSE.DOLLY, RIGHT: MOUSE.ROTATE };
+const TOUCHES = { ONE: TOUCH.PAN, TWO: TOUCH.DOLLY_ROTATE };
 
 interface Goal {
   target: Vector3;
@@ -169,6 +173,8 @@ export function CameraRig() {
       minDistance={2.5}
       maxDistance={3000}
       maxPolarAngle={Math.PI * 0.495}
+      mouseButtons={MOUSE_BUTTONS}
+      touches={TOUCHES}
     />
   );
 }

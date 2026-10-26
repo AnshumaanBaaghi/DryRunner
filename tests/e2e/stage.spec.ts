@@ -39,6 +39,44 @@ async function gotoStep(page: Page, i: number) {
 
 const primaryChip = (page: Page) => page.getByTestId('stage-viz').locator('[data-viz]').first();
 
+interface Pose { p: number[]; q: number[] }
+/** The 3D camera: moving the view shifts its position only, rotating also turns it. */
+const cameraPose = (page: Page): Promise<Pose> => page.evaluate(() => {
+  type Arr = { toArray(): number[] };
+  const { camera } = (window as unknown as { __algoscopeThree: { camera: { position: Arr; quaternion: Arr } } }).__algoscopeThree;
+  return { p: camera.position.toArray(), q: camera.quaternion.toArray() };
+});
+const gap = (a: number[], b: number[]) => Math.hypot(...a.map((v, k) => v - b[k]));
+
+/** Waits until the opening camera move is over. */
+async function settled(page: Page) {
+  await expect.poll(async () => {
+    const a = await cameraPose(page);
+    await page.waitForTimeout(250);
+    return gap(a.p, (await cameraPose(page)).p);
+  }, { timeout: 10_000 }).toBeLessThan(1e-4);
+}
+
+async function canvasCenter(page: Page) {
+  const box = (await page.getByTestId('stage-canvas').boundingBox())!;
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+/**
+ * Moving the view keeps the camera's orientation, rotating changes it — true while the camera still coasts
+ * after a gesture (damping is per frame, so under software rendering it coasts for seconds).
+ */
+async function expectMoved(page: Page, before: Pose): Promise<Pose> {
+  const after = await cameraPose(page);
+  expect(gap(after.p, before.p)).toBeGreaterThan(0.05);
+  expect(gap(after.q, before.q)).toBeLessThan(1e-3);
+  return after;
+}
+
+async function expectRotated(page: Page, before: Pose) {
+  expect(gap((await cameraPose(page)).q, before.q)).toBeGreaterThan(0.05);
+}
+
 test.describe('3D stage', () => {
   for (const c of CASES) {
     test(`${c.id} is shown as ${c.viz}${c.mode ? ` (${c.mode})` : ''} and animates both ways`, async ({ page }, info) => {
@@ -118,6 +156,53 @@ test.describe('3D stage', () => {
     await expect(page.getByRole('button', { name: /Camera follows changes/ })).toHaveAttribute('aria-pressed', 'false');
     await expect(page.getByRole('button', { name: /Quality:/ })).toHaveAttribute('aria-pressed', 'false');
     expect(errors).toEqual([]);
+  });
+
+  test('a drag moves the view and a two-finger (right-button) drag rotates it', async ({ page }) => {
+    const { errors } = await openApp(page);
+    // camera follow off, so only the gestures move the camera
+    await page.getByRole('button', { name: /Camera follows changes/ }).click();
+    await settled(page);
+    const drag = async (button: 'left' | 'right') => {
+      const { x, y } = await canvasCenter(page);
+      await page.mouse.move(x, y);
+      await page.mouse.down({ button });
+      for (let k = 1; k <= 10; k++) await page.mouse.move(x + k * 12, y + k * 4);
+      await page.mouse.up({ button });
+      await page.waitForTimeout(500);
+    };
+    const start = await cameraPose(page);
+    await drag('left');
+    const moved = await expectMoved(page, start);
+    await drag('right');
+    await expectRotated(page, moved);
+    expect(errors).toEqual([]);
+  });
+
+  test.describe('on a touch screen', () => {
+    test.skip(({ browserName }) => browserName !== 'chromium', 'multi-touch is simulated through the Chrome DevTools Protocol');
+    test.use({ hasTouch: true });
+
+    test('one finger moves the view and two fingers rotate it', async ({ page }) => {
+      const { errors } = await openApp(page);
+      await page.getByRole('button', { name: /Camera follows changes/ }).click();
+      await settled(page);
+      const cdp = await page.context().newCDPSession(page);
+      const swipe = async (fingers: number) => {
+        const { x, y } = await canvasCenter(page);
+        const at = (k: number) => Array.from({ length: fingers }, (_, f) => ({ x: x + f * 80 + k * 12, y: y + k * 4, id: f }));
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(0) });
+        for (let k = 1; k <= 10; k++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: at(k) });
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForTimeout(500);
+      };
+      const start = await cameraPose(page);
+      await swipe(1);
+      const moved = await expectMoved(page, start);
+      await swipe(2);
+      await expectRotated(page, moved);
+      expect(errors).toEqual([]);
+    });
   });
 
   test('full screen shows the 3D view with its own playback bar', async ({ page }, info) => {

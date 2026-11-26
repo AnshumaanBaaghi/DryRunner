@@ -1,8 +1,10 @@
 /**
  * A grid graph on a Grid2D: water deep blue, unvisited land green-brown, visited cells tinted by component and
- * raised, walls dark; the current cell amber with a pulsing rim, cells marked this step orange, probed cells
- * violet rims and the cells waiting (DFS path / BFS frontier) blue rims. Title and counter above the board;
- * the composition (headers included) is centered on x = 0 and keeps one size through the trace.
+ * raised (a backtracking DFS: while on its path, then a faint trail), walls dark; the current cell amber with a
+ * pulsing rim, cells marked or put back this step orange, probed cells violet rims and the cells waiting (DFS
+ * path / BFS frontier) blue rims. Title and counter above the board; the composition (headers included) is
+ * centered on x = 0 and keeps one size through the trace. A backtracking DFS shares the stage with its
+ * recursion tree: the camera keeps to the grid's current cell.
  */
 import { useCallback, useMemo } from 'react';
 import { useAnimTiming, useHighlight } from '../../scene/anim';
@@ -69,9 +71,9 @@ export function GridGraphView({ view, detection }: VizProps<GridGraphBindings>) 
   const rowHeaders = useMemo(() => (headers ? indexes(rows) : undefined), [headers, rows]);
   const colHeaders = useMemo(() => (headers ? indexes(cols) : undefined), [headers, cols]);
 
-  const { current, marked, probes, waiting } = m;
+  const { current, marked, unmarked, probes, waiting } = m;
   const marks = useMemo(() => {
-    // one rim per cell, the most telling first: current, marked now, probed, waiting
+    // one rim per cell, the most telling first: current, marked or put back now, probed, waiting
     const out: GridMark[] = [];
     const seen = new Set<string>();
     const add = (cell: Cell, color: string, pulseKey?: string) => {
@@ -81,17 +83,17 @@ export function GridGraphView({ view, detection }: VizProps<GridGraphBindings>) 
       out.push({ r: cell.r, c: cell.c, color, ...(pulseKey && { pulseKey }) });
     };
     if (current?.inside) add(current, COLORS.current, current.key);
-    for (const cell of marked) add(cell, COLORS.changed, stepKey);
+    for (const cell of [...marked, ...unmarked]) add(cell, COLORS.changed, stepKey);
     for (const p of probes) if (p.inside) add(p, COLORS.frontier);
     for (const cell of waiting) add(cell, COLORS.visited);
     return out;
-  }, [current, marked, probes, waiting, rows, cols, stepKey]);
+  }, [current, marked, unmarked, probes, waiting, rows, cols, stepKey]);
 
   const at = (r: number, c: number): Vec3 => {
     const [x, y] = cellPosition(geo, r, c);
     return [gridX + x, y, 0];
   };
-  useFocusPoint(detection.key, m.exists && m.focus ? at(m.focus.r, m.focus.c) : null, 2, stepKey);
+  useFocusPoint(detection.key, m.exists && m.focus ? at(m.focus.r, m.focus.c) : null, b.backtrack ? 3 : 2, stepKey);
   return (
     <group>
       <Label text={title} position={[-width / 2, height - 0.25, 0]} anchorX="left" size={TITLE_SIZE} color={COLORS.inkDim} />

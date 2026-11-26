@@ -7,9 +7,9 @@ import type { Highlight } from '../../../src/scene/anim';
 import { COLORS } from '../../../src/scene/primitives/materials';
 import { EMPTY, rowsAt } from '../../../src/visualizers/dp1d/table';
 import { detectGridGraph, type GridGraphBindings } from '../../../src/visualizers/gridGraph/detect';
-import { buildGridModel, LAND, OTHER, tintOf, WALL, WATER, type GridModel } from '../../../src/visualizers/gridGraph/model';
+import { buildGridModel, LAND, OTHER, tintOf, trailLook, WALL, WATER, type GridModel } from '../../../src/visualizers/gridGraph/model';
 import { timelineOf } from '../../helpers/timeline';
-import { FLOOD_FILL_BFS, HEAD_INDEX_BFS, MAZE_VISITED, ROTTING_ORANGES, TWO_GRIDS } from './cases';
+import { FLOOD_FILL_BFS, HEAD_INDEX_BFS, MAZE_ALL_PATHS, MAZE_VISITED, OBSTACLE_PATH, ROTTING_ORANGES, TWO_GRIDS } from './cases';
 
 async function setup(source: string): Promise<{ tl: Timeline; b: GridGraphBindings }> {
   const tl = await timelineOf(source);
@@ -30,10 +30,13 @@ function callAt(tl: Timeline, name: string, r: number, c: number): number {
   return [...tl.calls.values()].find((n) => n.fnId === fn && n.args[0] === r && n.args[1] === c)!.enterStep;
 }
 
-/** First step writing cell (r, c) of a 2D array (the grid by default). */
-function writeAt(tl: Timeline, b: GridGraphBindings, r: number, c: number, outer = b.objId): number {
-  return tl.diffs.findIndex((d, s) => d.heap.some((h) => h.op === 'set' && rowsAt(tl, outer, s).get(h.id) === r && h.path[0] === c));
+/** Steps writing cell (r, c) of a 2D array (the grid by default). */
+function writesTo(tl: Timeline, b: GridGraphBindings, r: number, c: number, outer = b.objId): number[] {
+  return tl.diffs.flatMap((d, s) => (d.heap.some((h) => h.op === 'set' && rowsAt(tl, outer, s).get(h.id) === r && h.path[0] === c) ? [s] : []));
 }
+
+/** First step writing cell (r, c) of a 2D array (the grid by default). */
+const writeAt = (tl: Timeline, b: GridGraphBindings, r: number, c: number, outer = b.objId) => writesTo(tl, b, r, c, outer)[0] ?? -1;
 
 describe('gridGraph model: islands (DFS sinking in place)', () => {
   it('sinking (0,0): the current cell amber, marked this step, the first island begun', async () => {
@@ -174,5 +177,59 @@ describe('gridGraph model: BFS and mazes', () => {
     expect([during.current, during.waiting, during.probes]).toEqual([null, [], []]);
     const end = at(tl, b, tl.steps.length - 1);
     expect([end.components, end.counter?.text]).toEqual([3, '3']);
+  });
+});
+
+describe('gridGraph model: a backtracking DFS', () => {
+  it('obstacle eliminations: the path tinted and raised, the 1s walls though crossed, the obstacle being crossed current', async () => {
+    const { tl, b } = await setup(OBSTACLE_PATH);
+    const [mark] = writesTo(tl, b, 0, 1);
+    const m = at(tl, b, mark);
+    expect(cells(m.marked)).toEqual(['0,1']);
+    expect([m.current, m.text[k(m, 0, 1)]]).toEqual([{ r: 0, c: 1, inside: true, key: `call:${tl.steps[mark].callId}` }, '2']);
+    expect([m.color[k(m, 0, 0)], m.ink[k(m, 0, 0)], m.component[k(m, 0, 0)], m.text[k(m, 0, 0)]]).toEqual([tintOf(0), COLORS.bg, 0, '2']);
+    expect([m.kind[k(m, 1, 0)], m.color[k(m, 1, 0)], m.kind[k(m, 0, 2)], m.color[k(m, 0, 2)]]).toEqual(['wall', WALL, 'land', LAND]);
+    expect(m.raise[k(m, 0, 0)]).toBeGreaterThan(m.raise[k(m, 0, 2)]);
+    expect(cells(m.waiting)).toEqual(['0,0']);
+  });
+
+  it('backing out of a cell: flagged as put back, then a faint trail of the tint over its own look', async () => {
+    const { tl, b } = await setup(OBSTACLE_PATH);
+    const [mark, unmark] = writesTo(tl, b, 2, 0);
+    expect(at(tl, b, unmark - 1).text[k(at(tl, b, unmark - 1), 2, 0)]).toBe('2');
+    const m = at(tl, b, unmark);
+    expect([cells(m.unmarked), m.marked, m.text[k(m, 2, 0)], m.focus]).toEqual([['2,0'], [], '0', { r: 2, c: 0 }]);
+    // once its call returned, the caller's cell is current again
+    const after = at(tl, b, tl.calls.get(tl.steps[unmark].callId)!.exitStep!);
+    expect(after.current).toMatchObject({ r: 2, c: 1 });
+    expect([after.color[k(after, 2, 0)], after.raise[k(after, 2, 0)], after.component[k(after, 2, 0)]]).toEqual([trailLook(0, 'land').color, 0, 0]);
+    expect(after.color[k(after, 2, 2)]).toBe(tintOf(0));
+    expect(trailLook(0, 'land').color).not.toBe(LAND);
+    // stepping back over the back-out: the cell is marked again, flagged as the undone change
+    const back = buildGridModel(tl, unmark - 1, b, backward(tl, unmark - 1));
+    expect([cells(back.unmarked), back.text[k(back, 2, 0)]]).toEqual([['2,0'], '2']);
+    expect(mark).toBeLessThan(unmark);
+  });
+
+  it('the finished run: every cell back to its value, visited ones trailing (crossed walls too), unreached ones plain', async () => {
+    const { tl, b } = await setup(OBSTACLE_PATH);
+    const m = at(tl, b, tl.steps.length - 1);
+    expect(m.text).toEqual(['0', '1', '0', '0', '1', '1', '0', '0', '0', '0', '0', '1', '1', '0', '1', '0', '0', '0', '0', '0']);
+    expect([m.kind[k(m, 0, 1)], m.color[k(m, 0, 1)], m.raise[k(m, 0, 1)]]).toEqual(['wall', trailLook(0, 'wall').color, trailLook(0, 'wall').raise]);
+    expect([m.color[k(m, 0, 0)], m.color[k(m, 1, 1)], m.component[k(m, 1, 1)]]).toEqual([trailLook(0, 'land').color, WALL, -1]);
+    expect([m.color[k(m, 4, 3)], m.component[k(m, 4, 3)]]).toEqual([LAND, -1]);
+    expect([m.current, m.waiting, m.components]).toEqual([null, [], 1]);
+  });
+
+  it('a visited 2D array unmarked (every path through an open maze): a cell trails between paths and is marked again', async () => {
+    const { tl, b } = await setup(MAZE_ALL_PATHS.replace("['.', '#', '.']", "['.', '.', '.']"));
+    expect(b.marks.kind).toBe('array');
+    const [mark, unmark, again] = writesTo(tl, b, 2, 1, b.marks.objId);
+    expect(mark < unmark && unmark < again).toBe(true);
+    const colorAt = (i: number) => at(tl, b, i).color[k(at(tl, b, i), 2, 1)];
+    const done = (s: number) => tl.calls.get(tl.steps[s].callId)!.exitStep!;
+    expect([colorAt(done(mark) - 1), colorAt(done(unmark))]).toEqual([COLORS.current, trailLook(0, 'land').color]);
+    expect(cells(at(tl, b, again).marked)).toEqual(['2,1']);
+    expect(at(tl, b, again).component[k(at(tl, b, again), 2, 1)]).toBe(0);
   });
 });

@@ -12,7 +12,8 @@ import { detectAll, selectDetections } from '../../../src/visualizers/select';
 import type { Detection } from '../../../src/visualizers/types';
 import { timelineOf } from '../../helpers/timeline';
 import {
-  FLOOD_FILL_BFS, HEAD_INDEX_BFS, ISLANDS_BFS_SET, MAZE_ALL_PATHS, MAZE_VISITED, REGIONS_STACK, UNIQUE_PATHS_MEMO, WORD_SEARCH, XY_FILL,
+  FLOOD_FILL_BFS, HEAD_INDEX_BFS, ISLANDS_BFS_SET, MAZE_ALL_PATHS, MAZE_VISITED, OBSTACLE_PATH, REGIONS_STACK, UNIQUE_PATHS_MEMO, WORD_SEARCH,
+  XY_FILL,
 } from './cases';
 
 async function detect(source: string): Promise<{ tl: Timeline; ds: Detection<GridGraphBindings>[] }> {
@@ -26,7 +27,7 @@ const withGrid = () => [...visualizers().filter((v) => v.id !== 'gridGraph'), gr
 const shown = async (source: string) => selectDetections(detectAll(await timelineOf(source), withGrid()).all);
 const names = (b: GridGraphBindings) => ({
   grid: b.grid.name, frontier: b.frontier?.name, row: b.rowVar?.name, col: b.colVar?.name, marks: b.marks.kind, visited: b.marks.ref?.name,
-  counter: b.counter?.name,
+  counter: b.counter?.name, backtrack: b.backtrack,
 });
 
 describe('gridGraph detection', () => {
@@ -105,12 +106,36 @@ describe('gridGraph detection', () => {
     expect(names(d.bindings)).toMatchObject({ grid: 'map', frontier: 'todo', row: 'y', col: 'x', marks: 'inPlace' });
   });
 
-  it.each([
-    ['word search (cells restored after the recursive calls)', WORD_SEARCH],
-    ['a path search unmarking cells once its calls returned', MAZE_ALL_PATHS],
-    ['a memo table stored after recursing', UNIQUE_PATHS_MEMO],
-  ])('leaves %s alone', async (_, source) => {
-    expect((await detect(source)).ds).toEqual([]);
+  it('a path search unmarking cells once its calls returned: backtracking, the recursion left to its tree', async () => {
+    const { tl, ds } = await detect(MAZE_ALL_PATHS);
+    expect(ds).toHaveLength(1);
+    const [d] = ds;
+    expect(names(d.bindings)).toEqual({ grid: 'maze', frontier: undefined, row: 'r', col: 'c', marks: 'array', visited: 'seen', counter: undefined, backtrack: true });
+    expect(d.bindings.traversalFn).toBe(fnId(tl, 'walk'));
+    expect(d.claims.filter((c) => c.startsWith('fn:'))).toEqual([]);
+  });
+
+  it('obstacle eliminations: the grid of values walked, not the memo table of objects shaped like it; marks in place, put back', async () => {
+    const { tl, ds } = await detect(OBSTACLE_PATH);
+    expect(ds).toHaveLength(1);
+    const [d] = ds;
+    const b = d.bindings;
+    expect(names(b)).toEqual({ grid: 'grid', frontier: undefined, row: 'row', col: 'col', marks: 'inPlace', visited: undefined, counter: undefined, backtrack: true });
+    expect([b.rows, b.cols, b.traversalFn, b.argIdx]).toEqual([5, 4, fnId(tl, 'shortestPossiblePath'), [4, 5]]);
+    const dp = analyzeTrace(tl).vars.get(varKey({ name: 'dp', fnId: fnId(tl, 'shortestPath') }))!;
+    for (const id of dp.heapIds) expect(d.claims).not.toContain(`obj:${id}`);
+    expect(d.claims.filter((c) => c.startsWith('fn:'))).toEqual([]);
+  });
+
+  it('word search: cells restored after the recursive calls read as backtracking too', async () => {
+    const { ds } = await detect(WORD_SEARCH);
+    expect(ds.map((d) => names(d.bindings))).toEqual([
+      { grid: 'board', frontier: undefined, row: 'r', col: 'c', marks: 'inPlace', visited: undefined, counter: undefined, backtrack: true },
+    ]);
+  });
+
+  it('leaves a memo table stored after recursing alone', async () => {
+    expect((await detect(UNIQUE_PATHS_MEMO)).ds).toEqual([]);
   });
 });
 
@@ -132,6 +157,16 @@ describe('gridGraph selection', () => {
     expect(chosen[0]).toMatchObject({ vizId: 'gridGraph', title: 'maze' });
     expect(chosen.map((d) => d.vizId)).not.toContain('recursionTree');
     expect(chosen.some((d) => d.vizId === 'array' && d.title === 'visited')).toBe(false);
+  });
+
+  it.each([
+    ['shortest path with obstacle eliminations', OBSTACLE_PATH, 'grid', 'shortestPossiblePath'],
+    ['every path through a maze', MAZE_ALL_PATHS, 'maze', 'walk'],
+  ])('backtracking path search (%s): the grid first, its recursion tree beside it, the call stack', async (_, source, grid, fn) => {
+    const chosen = await shown(source);
+    expect(chosen.map((d) => `${d.vizId}:${d.title}:${d.role}`)).toEqual([
+      `gridGraph:${grid}:primary`, `recursionTree:${fn}:secondary`, 'callStack:call stack:aux',
+    ]);
   });
 
   it('look-alikes keep their own views', async () => {

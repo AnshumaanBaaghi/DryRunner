@@ -1,11 +1,13 @@
 /**
  * What a traversal leaves on its grid: the cells it marks visited — rewritten in place ('1' → '0'), set in a
  * separate visited 2D array or added to a visited Set — each cell's first mark only, made while the traversal
- * runs (inside a DFS call, or right around the step a BFS adds or takes out that cell). Marks group into
+ * runs (inside a DFS call, or right around the step a BFS adds or takes out that cell). A backtracking DFS puts
+ * cells back once its recursive calls returned: its marks come and go (`pathEvents`). Marks group into
  * components: the outermost DFS call, or the BFS run, they were made in. Only steps where the grid variable
  * holds this grid count (`live`), so a second run on another grid leaves this one alone. Pure.
  */
 import { valueAt, varKey, type VarRef } from '../../engine/detect/track';
+import { keyRepr } from '../../engine/timeline/heap';
 import type { Timeline } from '../../engine/timeline/types';
 import { deref, refId } from '../../engine/timeline/values';
 import { sameV, type ObjId, type V } from '../../engine/types/values';
@@ -56,6 +58,18 @@ export interface Component {
   end: number;
 }
 
+/** A cell put back as it was before its mark: a backtracking DFS backing out of it. */
+export interface UnmarkEvent extends Cell {
+  step: number;
+  callId: number;
+}
+
+export interface PathEvents {
+  /** every mark, a cell marked again after it was put back included */
+  marks: Omit<MarkEvent, 'comp'>[];
+  unmarks: UnmarkEvent[];
+}
+
 /** steps around adding / taking out a cell within which a BFS write to it is its mark */
 const SLACK = 4;
 
@@ -92,7 +106,7 @@ interface Write extends Cell {
   value?: V;
 }
 
-/** Writes changing cells of the target: `set`s on rows of a 2D array, `add`s to a Set. */
+/** Writes changing cells of the target: `set`s on rows of a 2D array, `add`s to (value true) and `delete`s from a Set. */
 function targetWrites(tl: Timeline, spec: GridSpec, kind: MarkKind, id: ObjId): Write[] {
   const out: Write[] = [];
   for (let s = 0; s < tl.diffs.length; s++) {
@@ -100,8 +114,8 @@ function targetWrites(tl: Timeline, spec: GridSpec, kind: MarkKind, id: ObjId): 
     if (!heap.length) continue;
     for (const h of heap) {
       if (kind === 'set') {
-        const cell = h.op === 'setAdd' && h.id === id ? keyCell(tl, h.key, spec.cols) : null;
-        if (cell && isInside(spec, cell.r, cell.c)) out.push({ ...cell, step: s, value: true });
+        const cell = (h.op === 'setAdd' || h.op === 'setDelete') && h.id === id ? keyCell(tl, h.key, spec.cols) : null;
+        if (cell && isInside(spec, cell.r, cell.c)) out.push({ ...cell, step: s, value: h.op === 'setAdd' });
         continue;
       }
       if (h.op !== 'set' || typeof h.path[0] !== 'number' || (h.old !== undefined && sameV(h.old, h.value))) continue;
@@ -129,7 +143,7 @@ export function markEvents(tl: Timeline, spec: GridSpec, kind: MarkKind, id: Obj
   const out: Omit<MarkEvent, 'comp'>[] = [];
   const seen = new Set<string>();
   for (const w of targetWrites(tl, spec, kind, id)) {
-    if (!live[w.step] || seen.has(cellKey(w))) continue;
+    if (!live[w.step] || seen.has(cellKey(w)) || (kind === 'set' && w.value === false)) continue;
     let callId: number | undefined;
     if (spec.traversalFn !== undefined) {
       callId = traversalCallAt(tl, spec.traversalFn, w.step) ?? undefined;
@@ -142,6 +156,37 @@ export function markEvents(tl: Timeline, spec: GridSpec, kind: MarkKind, id: Obj
     const verb: MarkVerb = kind !== 'inPlace' ? 'visit' : isWaterValue(w.value) ? 'sink' : 'fill';
     const was = kind === 'inPlace' ? w.old : gridValue(tl, spec, w, w.step);
     out.push({ r: w.r, c: w.c, step: w.step, verb, was, ...(callId !== undefined && { callId }) });
+  }
+  return out;
+}
+
+/**
+ * A backtracking DFS's marks as they come and go, in step order: each mark (a cell marked again once put back
+ * included) and each unmark, the cell put back as it was before its mark (`grid[r][c] = 2 … = 0`,
+ * `seen[r][c] = false`, `seen.delete(key)`).
+ */
+export function pathEvents(tl: Timeline, spec: GridSpec, kind: MarkKind, id: ObjId): PathEvents {
+  const out: PathEvents = { marks: [], unmarks: [] };
+  if (kind === 'none' || spec.traversalFn === undefined) return out;
+  const live = liveSteps(tl, spec);
+  /** cells marked now → what they held before the mark (`keyRepr`; a Set's keys are 'in' or 'out') */
+  const held = new Map<string, string>();
+  for (const w of targetWrites(tl, spec, kind, id)) {
+    const callId = live[w.step] ? traversalCallAt(tl, spec.traversalFn, w.step) : null;
+    if (callId === null) continue;
+    const key = cellKey(w);
+    const now = kind === 'set' ? (w.value ? 'in' : 'out') : keyRepr(w.value);
+    const rest = held.get(key);
+    if (rest === undefined) {
+      const before = kind === 'set' ? 'out' : w.old === undefined ? 'absent' : keyRepr(w.old);
+      if (now === before) continue;
+      held.set(key, before);
+      const was = kind === 'inPlace' ? w.old : gridValue(tl, spec, w, w.step);
+      out.marks.push({ r: w.r, c: w.c, step: w.step, verb: 'visit', was, callId });
+    } else if (now === rest) {
+      held.delete(key);
+      out.unmarks.push({ r: w.r, c: w.c, step: w.step, callId });
+    }
   }
   return out;
 }

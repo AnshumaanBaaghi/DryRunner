@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { OBSTACLE_PATH } from '../visualizers/gridGraph/cases';
 import { counter, openApp, runCode, selectExample, waitDone, type Hook } from './helpers';
 
 /** What each example must show without any override (primary view first, then the others). */
@@ -100,6 +101,25 @@ test.describe('3D stage', () => {
       expect(external).toEqual([]);
     });
   }
+
+  test('a grid search backing out of its cells shows the grid, its recursion tree and the call stack', async ({ page }) => {
+    const { errors } = await openApp(page);
+    await runCode(page, OBSTACLE_PATH);
+    await expect(primaryChip(page)).toHaveAttribute('data-viz', 'gridGraph');
+    for (const other of ['recursionTree', 'callStack']) await expect(page.getByTestId('stage-viz').locator(`[data-viz="${other}"]`)).toHaveCount(1);
+    // the first cell put back: grid[2][0] = 0 after its four calls returned
+    const backOut = await page.evaluate(() => {
+      type Diff = { heap: { op: string; old?: unknown; value?: unknown }[] };
+      const run = (window as unknown as { __algoscope: { run: { getState(): { timeline: { diffs: Diff[] } } } } }).__algoscope.run.getState();
+      return run.timeline.diffs.findIndex((d) => d.heap.some((h) => h.op === 'set' && h.old === 2 && h.value === 0));
+    });
+    await gotoStep(page, backOut);
+    await expect(page.getByTestId('hud-viz')).toContainText('back out of (2,0)');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByTestId('hud-viz')).toContainText('back out of (2,0)');
+    expect(errors).toEqual([]);
+  });
 
   test('plugin notes describe how the window moves', async ({ page }) => {
     await openApp(page);

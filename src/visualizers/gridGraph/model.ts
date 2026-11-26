@@ -2,18 +2,19 @@
  * Pure per-step model of the grid-graph view (testable without WebGL). Per cell (row-major): value text, kind,
  * the component it was visited in (-1: not yet), tile color, label color and raise — water deep blue, unvisited
  * land green-brown, visited cells tinted by component and raised a little, walls dark, the current cell amber.
- * Plus the current cell, this step's probes and marks (stepping back: the undone step's), the cells waiting
- * (DFS path / BFS frontier), the counter and where to focus.
+ * A backtracking DFS's cells are tinted while marked (on its path); those it put back keep a faint trail of the
+ * tint over their own look. Plus the current cell, this step's probes, marks and unmarks (stepping back: the
+ * undone step's), the cells waiting (DFS path / BFS frontier), the counter and where to focus.
  */
 import { valueAt } from '../../engine/detect/track';
 import type { Timeline } from '../../engine/timeline/types';
 import { deref, primitive } from '../../engine/timeline/values';
 import type { Highlight } from '../../scene/anim';
 import { COLORS } from '../../scene/primitives/materials';
-import { cellKey, cellText, EMPTY } from '../dp1d/table';
+import { cellKey, cellText, EMPTY, mixHex } from '../dp1d/table';
 import { kindOf, type Cell, type CellKind, type GridCell } from './cells';
 import type { GridGraphBindings } from './detect';
-import { currentAt, focusTrail, gridFacts, lastAtOrBefore, probesAt, waitingAt, type Current } from './facts';
+import { currentAt, focusTrail, gridFacts, lastAtOrBefore, markedAt, probesAt, waitingAt, type Current } from './facts';
 
 export const CELL = 0.9;
 export const GAP = 0.08;
@@ -28,6 +29,8 @@ export const TINTS = ['#2dd4bf', '#f472b6', '#a3e635', '#e879f9', '#fca5a5'] as 
 const VISITED_RAISE = 0.14;
 const CURRENT_RAISE = 0.26;
 const WALL_RAISE = 0.1;
+/** how much of its component's tint a cell a backtracking DFS put back keeps */
+const TRAIL = 0.3;
 
 export const tintOf = (comp: number) => TINTS[comp % TINTS.length];
 
@@ -39,7 +42,7 @@ export interface GridModel {
   /** row-major, rows × cols */
   text: string[];
   kind: CellKind[];
-  /** component (0-based) a cell was visited in, -1 while unvisited */
+  /** component (0-based) a cell was visited in, -1 while unvisited (a cell a backtracking DFS put back included) */
   component: number[];
   color: string[];
   ink: string[];
@@ -49,6 +52,8 @@ export interface GridModel {
   probes: GridCell[];
   /** cells marked visited this step */
   marked: Cell[];
+  /** cells a backtracking DFS put back this step */
+  unmarked: Cell[];
   /** the DFS calls below the current one, or the frontier's waiting cells */
   waiting: Cell[];
   counter: { name: string; text: string } | null;
@@ -63,6 +68,12 @@ const KIND_LOOK: Record<CellKind, { color: string; ink: string; raise: number }>
   wall: { color: WALL, ink: COLORS.inkFaint, raise: WALL_RAISE },
   other: { color: OTHER, ink: COLORS.ink, raise: 0 },
 };
+
+/** A cell a backtracking DFS visited and put back: its own look with a little of its component's tint. */
+export function trailLook(comp: number, kind: CellKind): { color: string; ink: string; raise: number } {
+  const own = KIND_LOOK[kind];
+  return { ...own, color: mixHex(own.color, tintOf(comp), TRAIL) };
+}
 
 function counterOf(tl: Timeline, b: GridGraphBindings, at: number): GridModel['counter'] {
   if (!b.counter) return null;
@@ -79,6 +90,7 @@ export function buildGridModel(tl: Timeline, i: number, b: GridGraphBindings, hl
   const hs = hl ? Math.min(hl.reversed ? i + 1 : i, tl.steps.length - 1) : -1;
   const probes = hs < 0 ? [] : probesAt(tl, b, f, hs);
   const marked = hs < 0 ? [] : (f.byStep.get(hs) ?? []).map((m) => ({ r: m.r, c: m.c }));
+  const unmarked = hs < 0 ? [] : f.unmarkedAt.get(hs) ?? [];
   const text: string[] = [];
   const kind: CellKind[] = [];
   const component: number[] = [];
@@ -95,7 +107,8 @@ export function buildGridModel(tl: Timeline, i: number, b: GridGraphBindings, hl
       const isCurrent = current?.inside && current.r === r && current.c === c;
       const look = v === undefined ? { color: EMPTY, ink: COLORS.inkFaint, raise: 0 }
         : isCurrent ? { color: COLORS.current, ink: COLORS.bg, raise: CURRENT_RAISE }
-          : comp >= 0 ? { color: tintOf(comp), ink: COLORS.bg, raise: VISITED_RAISE } : KIND_LOOK[k];
+          : comp < 0 ? KIND_LOOK[k]
+            : markedAt(f, { r, c }, i) ? { color: tintOf(comp), ink: COLORS.bg, raise: VISITED_RAISE } : trailLook(comp, k);
       text.push(v === undefined ? '' : cellText(tl, snap, v));
       kind.push(k);
       component.push(comp);
@@ -106,7 +119,7 @@ export function buildGridModel(tl: Timeline, i: number, b: GridGraphBindings, hl
   }
   // nothing to look at this step: the focus stays on the last cell that had something going on
   const trail = focusTrail(tl, b);
-  const focus = current?.inside ? current : marked[0] ?? probes.find((p) => p.inside) ?? trail[lastAtOrBefore(trail, i)];
+  const focus = current?.inside ? current : marked[0] ?? unmarked[0] ?? probes.find((p) => p.inside) ?? trail[lastAtOrBefore(trail, i)];
   return {
     exists: outer !== undefined,
     rows: b.rows,
@@ -120,6 +133,7 @@ export function buildGridModel(tl: Timeline, i: number, b: GridGraphBindings, hl
     current,
     probes,
     marked,
+    unmarked,
     waiting: waitingAt(tl, b, f, i, current),
     counter: counterOf(tl, b, f.lastLive[i]),
     components: lastAtOrBefore(f.begun, i) + 1,

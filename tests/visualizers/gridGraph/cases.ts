@@ -1,4 +1,4 @@
-/** Grid programs for the grid-graph tests: BFS / iterative DFS / maze traversals and look-alikes that are not grid graphs. */
+/** Grid programs for the grid-graph tests: BFS / iterative DFS / maze traversals, backtracking path searches and look-alikes. */
 
 /** BFS flood fill: a queue of [r, c] pairs, cells recolored in place as they are queued. */
 export const FLOOD_FILL_BFS = `function floodFill(image, sr, sc, color) {
@@ -252,3 +252,49 @@ export const HEAD_INDEX_BFS = `function shortest(grid) {
   return dist[n - 1][n - 1];
 }
 console.log(shortest([[0, 0, 0], [1, 1, 0], [0, 0, 0]]));`;
+
+/**
+ * Shortest path with k obstacle eliminations by DFS: cells marked 2 while on the path and put back once the four
+ * recursive calls returned, results kept in a memo table of objects (`dp[r][c][k]`) shaped like the grid.
+ */
+export const OBSTACLE_PATH = `const shortestPossiblePath = (grid, rowCount, colCount, k, row, col, dp) => {
+  if (row < 0 || col < 0 || row >= rowCount || col >= colCount || grid[row][col] == 2) return Infinity;
+  if (row == rowCount - 1 && col == colCount - 1) return 0;
+  if (!isNaN(dp[row][col][k])) return dp[row][col][k];
+  if (grid[row][col] == 1) {
+    if (k <= 0) return Infinity;
+    grid[row][col] = 2;
+    const left = shortestPossiblePath(grid, rowCount, colCount, k - 1, row, col - 1, dp);
+    const right = shortestPossiblePath(grid, rowCount, colCount, k - 1, row, col + 1, dp);
+    const top = shortestPossiblePath(grid, rowCount, colCount, k - 1, row - 1, col, dp);
+    const bottom = shortestPossiblePath(grid, rowCount, colCount, k - 1, row + 1, col, dp);
+    grid[row][col] = 1;
+    const min = Math.min(left, right, top, bottom) + 1;
+    dp[row][col][k] = min;
+    return min;
+  }
+  grid[row][col] = 2;
+  const left = shortestPossiblePath(grid, rowCount, colCount, k, row, col - 1, dp);
+  const right = shortestPossiblePath(grid, rowCount, colCount, k, row, col + 1, dp);
+  const top = shortestPossiblePath(grid, rowCount, colCount, k, row - 1, col, dp);
+  const bottom = shortestPossiblePath(grid, rowCount, colCount, k, row + 1, col, dp);
+  grid[row][col] = 0;
+  const min = Math.min(left, right, top, bottom) + 1;
+  dp[row][col][k] = min;
+  return min;
+};
+
+function shortestPath(grid, k) {
+  const dp = new Array(grid.length).fill(null).map(() => new Array(grid[0].length).fill(null).map(() => ({})));
+  const ans = shortestPossiblePath(grid, grid.length, grid[0].length, k, 0, 0, dp);
+  return ans == Infinity ? -1 : ans;
+}
+
+const grid = [
+  [0, 1, 0, 0],
+  [1, 1, 0, 0],
+  [0, 0, 0, 1],
+  [1, 0, 1, 0],
+  [0, 0, 0, 0],
+];
+console.log(shortestPath(grid, 1));`;

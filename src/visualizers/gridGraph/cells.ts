@@ -91,3 +91,15 @@ export function kindOf(v: V | undefined, open: ReadonlySet<string>): CellKind {
 
 /** A marking write that turns the cell into water (`'1' → '0'`) sinks it; any other value fills it. */
 export const isWaterValue = (v: V | undefined) => WATER.has(keyRepr(v));
+
+/**
+ * The ground a traversal walks (`keyRepr`): the values cells had when it marked them, first mark first. A search
+ * crossing obstacles (a budget of eliminations) marks both kinds of cell on a 0 / 1 map: the kind it started on
+ * is the ground, so the other kind keeps reading as obstacles.
+ */
+export function groundOf(was: readonly (V | undefined)[], crossing: boolean): Set<string> {
+  const open = new Set(was.map((v) => keyRepr(v)));
+  if (!crossing || !was.length || ![...open].every((k) => WATER.has(k) || LAND.has(k))) return open;
+  const water = WATER.has(keyRepr(was[0]));
+  return new Set([...open].filter((k) => WATER.has(k) === water));
+}

@@ -1,10 +1,10 @@
-/** Grid-graph HUD lines: cells probed (and stepped onto off the grid), cells sunk / filled / visited, islands counted. */
+/** Grid-graph HUD lines: cells probed (and stepped onto off the grid), cells sunk / filled / visited / backed out of, islands counted. */
 import { describe, expect, it } from 'vitest';
 import { analyzeTrace } from '../../../src/engine/detect/analysis';
 import { exampleById } from '../../../src/examples';
 import { gridGraphVisualizer } from '../../../src/visualizers/gridGraph';
 import { timelineOf } from '../../helpers/timeline';
-import { FLOOD_FILL_BFS, HEAD_INDEX_BFS, ISLANDS_BFS_SET, MAZE_VISITED } from './cases';
+import { FLOOD_FILL_BFS, HEAD_INDEX_BFS, ISLANDS_BFS_SET, MAZE_VISITED, OBSTACLE_PATH } from './cases';
 
 /** Every non-empty HUD block of the run, in order. */
 async function hud(source: string): Promise<string[][]> {
@@ -60,5 +60,18 @@ describe('gridGraph describe', () => {
     const lines = blocks.flat();
     expect(lines.filter((l) => l.startsWith('new island'))).toEqual(['new island #1', 'new island #2', 'new island #3']);
     expect(lines).toContain('probe (0,0): visited');
+  });
+
+  it('backtracking: cells visited, its own path probed, obstacles probed as walls, every cell backed out of in the end', async () => {
+    const lines = (await hud(OBSTACLE_PATH)).flat();
+    expect(lines.slice(0, 8)).toEqual([
+      'probe (0,0): land', 'probe (0,0): land', 'visit (0,0)', 'probe (0,-1): off the grid', 'probe (0,1): wall', 'probe (0,1): wall',
+      'visit (0,1)', 'probe (0,0): on the path',
+    ]);
+    const visits = lines.filter((l) => l.startsWith('visit')).map((l) => l.slice('visit '.length));
+    const backs = lines.filter((l) => l.startsWith('back out of')).map((l) => l.slice('back out of '.length));
+    expect(backs.at(0)).toBe('(2,0)');
+    expect(backs.at(-1)).toBe('(0,0)');
+    expect([...backs].sort()).toEqual([...visits].sort());
   });
 });

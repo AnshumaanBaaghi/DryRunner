@@ -1,12 +1,15 @@
 /**
  * Grid graphs: a 2D array (an outer array of row arrays) a traversal walks cell by cell — a recursive DFS
  * whose calls take (r, c) and step to neighbor cells, or a BFS / iterative DFS whose frontier holds [r, c]
- * pairs — reading the grid at the cells it moves to (at least MIN_MOVES such moves). Of the 2D arrays the
- * moves read, the grid is the one starting out most varied (a visited array starts uniform). Cells are
- * marked visited in place, in a visited 2D array or in a visited Set (`'r,c'` keys). Not a DP table (an
- * ordered fill: dp2d), not a backtracking board (marks undone after the recursive call) and not a memo
- * (values stored after recursing). A counter going up once per component (`count++` around each outermost
- * call or BFS run) names the components. The frontier is never claimed: the queue / stack views keep it.
+ * pairs — reading the grid at the cells it moves to (at least MIN_MOVES such moves). Of the 2D arrays of plain
+ * values the moves read (a table of objects is a memo), the grid is the one starting out most varied (a visited
+ * array starts uniform). Cells are marked visited in place, in a visited 2D array or in a visited Set (`'r,c'`
+ * keys). Not a DP table (an ordered fill: dp2d) and not a memo (values stored after recursing). A DFS putting
+ * its marks back once its recursive calls returned is a path search backtracking (`backtrack`): the grid shows
+ * the path it is on and the recursion tree keeps its own view of the branches tried and what they returned (the
+ * backtracking view, scoring higher, still takes the boards it recognizes). A counter going up once per
+ * component (`count++` around each outermost call or BFS run) names the components. The frontier is never
+ * claimed: the queue / stack views keep it.
  */
 import type { TraceAnalysis, VarInfo } from '../../engine/detect/analysis';
 import { valueAt, varKey, type VarRef } from '../../engine/detect/track';
@@ -32,6 +35,8 @@ export interface GridGraphBindings extends GridSpec {
   marks: GridMarks;
   /** goes up once per component (`count` of islands) */
   counter?: VarRef;
+  /** the DFS puts cells back once its recursive calls returned (a path search backtracking) */
+  backtrack?: boolean;
 }
 
 export const GRID_GRAPH_SCORE = 0.9;
@@ -43,11 +48,20 @@ interface Candidate {
   reads: Map<string, number[]>;
 }
 
-/** 2D arrays read at enough cells to be walked: not a frontier, not a DP fill. */
+/** Every cell of the 2D array holds a plain value (number, string, boolean) once the run is over. */
+function holdsValues(tl: Timeline, id: ObjId): boolean {
+  const snap = tl.snapshots[tl.snapshots.length - 1];
+  for (const row of snap.heap.get(id)?.elems ?? []) {
+    for (const v of deref(snap, row)?.elems ?? []) if (refId(v) !== null) return false;
+  }
+  return true;
+}
+
+/** 2D arrays of plain values read at enough cells to be walked: not a frontier, not a DP fill. */
 function candidates(tl: Timeline, a: TraceAnalysis, skip: ReadonlySet<ObjId>): Candidate[] {
   const out: Candidate[] = [];
   for (const o of a.objects.values()) {
-    if (o.kind !== 'array' || !o.nested || o.reads < MIN_MOVES || skip.has(o.id)) continue;
+    if (o.kind !== 'array' || !o.nested || o.reads < MIN_MOVES || skip.has(o.id) || !holdsValues(tl, o.id)) continue;
     const shape = tableShape(tl, o.id);
     if (shape.rows * shape.cols < MIN_MOVES || isDpFill(fillStats(writeSteps2d(tl, o.id)), MIN_MOVES)) continue;
     const reads = new Map<string, number[]>();
@@ -289,12 +303,14 @@ export function detectGridGraph(ctx: DetectContext): Detection<GridGraphBindings
       ...(t.kind === 'dfs' ? { traversalFn: t.fnId } : { frontier: t.frontier }),
     };
     const { marks, events, memo } = chooseMarks(tl, a, spec, frontiers);
+    if (memo) continue;
     const { changed, undone } = undoneMarks(tl, spec, marks);
-    if (memo || (undone > 0 && undone * 2 >= changed)) continue;
+    const backtrack = undone > 0 && undone * 2 >= changed;
     const { components } = groupMarks(tl, spec, events);
     const counter = counterFor(tl, a, spec, components);
     const visited = marks.kind === 'array' || marks.kind === 'set' ? objClaims(tl, a, marks.objId!, marks.kind === 'array') : [];
-    const claims = [...objClaims(tl, a, g.id, true), ...visited, ...(t.kind === 'dfs' ? [`fn:${t.fnId}`] : [])];
+    // the recursion gives way, unless it backtracks: the grid then only shows the path it is on
+    const claims = [...objClaims(tl, a, g.id, true), ...visited, ...(t.kind === 'dfs' && !backtrack ? [`fn:${t.fnId}`] : [])];
     out.push({
       vizId: 'gridGraph',
       key: `gridGraph:obj:${g.id}`,
@@ -302,7 +318,7 @@ export function detectGridGraph(ctx: DetectContext): Detection<GridGraphBindings
       score: GRID_GRAPH_SCORE,
       role: 'primary',
       claims: [...new Set(claims)],
-      bindings: { ...spec, ...coordVars(tl, a, f), marks, ...(counter && { counter }) },
+      bindings: { ...spec, ...coordVars(tl, a, f), marks, ...(counter && { counter }), ...(backtrack && { backtrack }) },
     });
   }
   return out;
